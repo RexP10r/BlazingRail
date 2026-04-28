@@ -1,0 +1,4 @@
+task.txt
+.env
+target/
+Cargo.lock
