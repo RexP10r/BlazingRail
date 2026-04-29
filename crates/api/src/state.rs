@@ -1,7 +1,7 @@
 pub struct AppState {}
 
 impl AppState {
-    pub fn init() -> Self {
+    pub fn new() -> Self {
         Self {}
     }
 }

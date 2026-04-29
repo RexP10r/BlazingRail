@@ -11,7 +11,7 @@ use handler::handle_create_event;
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let state = Arc::new(AppState::init());
+    let state = Arc::new(AppState::new());
 
     let app: Router = Router::new()
         .route("/v1/events", post(handle_create_event))
