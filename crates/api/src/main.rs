@@ -3,6 +3,8 @@ use axum::{Router, routing::post};
 use std::{net::SocketAddr, sync::Arc};
 use tokio::net::TcpListener;
 
+mod error;
+
 mod state;
 use state::AppState;
 

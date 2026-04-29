@@ -16,7 +16,7 @@ impl EventInput {
         if self.event_type.len() > 64 {
             return Err(ValidationError::EventTypeTooLong);
         }
-        if self.payload.to_string().len() > 4096 {
+        if size_of_val(&self.payload) > 4096 {
             return Err(ValidationError::PayloadTooLarge);
         }
         Ok(())
