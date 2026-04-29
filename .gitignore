@@ -2,3 +2,5 @@ task.txt
 .env
 target/
 Cargo.lock
+task.yaml
+
