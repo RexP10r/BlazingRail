@@ -51,7 +51,7 @@ async fn main() -> Result<()> {
         .with_state(Arc::new(state))
         .route("/health", get(check_health));
 
-    let addr = SocketAddr::from(([127, 0, 0, 1], config.server_port));
+    let addr = SocketAddr::from((config.server_host, config.server_port));
     println!("Server launched on {}", &addr);
 
     let listener = TcpListener::bind(addr).await?;
