@@ -1,4 +1,4 @@
-use axum::{Json, extract::State, http::StatusCode, response::IntoResponse};
+use axum::{Json, extract::State, http::StatusCode, response::{IntoResponse, Response}};
 use common::{EventInput, models::RawEventInput};
 use std::sync::Arc;
 use tokio::sync::mpsc::error::TrySendError;
@@ -20,7 +20,11 @@ pub async fn handle_create_event(
         TrySendError::Closed(_) => AppError::Internal(anyhow::anyhow!("Channel closed")),
     })?;
 
-    tracing::info!("Received event");
+    tracing::debug!("Event validated");
 
     Ok(StatusCode::ACCEPTED)
+}
+
+pub async fn check_health() -> Response {
+    StatusCode::ACCEPTED.into_response()
 }

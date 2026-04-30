@@ -14,3 +14,4 @@ common = {path = "../common"}
 json_size = "0.2.2"
 tracing = "0.1.44"
 tracing-subscriber = {version = "0.3.23", features=["env-filter", "json"]}
+dotenvy = "0.15.7"

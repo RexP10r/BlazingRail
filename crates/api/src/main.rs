@@ -1,6 +1,7 @@
 use anyhow::Result;
-use axum::{Router, routing::post};
+use axum::{Router, routing::post, routing::get};
 use common::{AppConfig, EventInput};
+use dotenvy::dotenv;
 use std::env;
 use std::{net::SocketAddr, sync::Arc};
 use tokio::{net::TcpListener, sync::mpsc::channel};
@@ -16,8 +17,12 @@ use state::AppState;
 mod handler;
 use handler::handle_create_event;
 
+use crate::handler::check_health;
+
 #[tokio::main]
 async fn main() -> Result<()> {
+    dotenv().ok();
+    
     let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
     let json_layer = fmt::layer().json();
     tracing_subscriber::registry()
@@ -43,7 +48,8 @@ async fn main() -> Result<()> {
     let state = AppState::new(config.clone(), tx);
     let app: Router = Router::new()
         .route("/v1/events", post(handle_create_event))
-        .with_state(Arc::new(state));
+        .with_state(Arc::new(state))
+        .route("/health", get(check_health));
 
     let addr = SocketAddr::from(([127, 0, 0, 1], config.server_port));
     println!("Server launched on {}", &addr);
