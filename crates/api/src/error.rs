@@ -6,6 +6,7 @@ use axum::{
 use serde::Serialize;
 use common::ValidationError;
 
+
 #[derive(Debug, thiserror::Error)]
 #[allow(unused)]
 pub enum AppError {
@@ -17,6 +18,9 @@ pub enum AppError {
 
     #[error("internal server error {0}")]
     Internal(#[from] anyhow::Error),
+
+    #[error("invalid json payload")]
+    JsonParse(#[from] serde_json::Error),
 }
 
 #[derive(Serialize)]
@@ -42,6 +46,11 @@ impl IntoResponse for AppError {
                 "Internal Error",
                 e.to_string(),
             ),
+            AppError::JsonParse(e) => (
+                StatusCode::BAD_REQUEST,
+                "Json Parse Error",
+                e.to_string()
+            )
         };
         let body = Json(AppErrorResponse {
             type_: format!("https://api.blazingrail.dev/errors{}", status.as_str()),

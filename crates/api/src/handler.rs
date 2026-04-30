@@ -1,5 +1,5 @@
 use axum::{Json, extract::State, http::StatusCode, response::IntoResponse};
-use common::{EventInput, models::RawEventInput, ValidationError};
+use common::{EventInput, models::RawEventInput};
 use std::sync::Arc;
 use tokio::sync::mpsc::error::TrySendError;
 
@@ -11,8 +11,7 @@ pub async fn handle_create_event(
 ) -> Result<impl IntoResponse, AppError> {
     raw_event.validate()?;
 
-    let event_input =
-        EventInput::from_raw(raw_event).map_err(|_| AppError::Validation(ValidationError::PayloadTooLarge))?;
+    let event_input = EventInput::from_raw(raw_event)?;
 
     event_input.validate()?;
 

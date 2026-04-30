@@ -18,12 +18,12 @@ async fn main() -> Result<()> {
 
     let (tx, _rx) = channel::<EventInput>(config.channel_capacity);
 
-    let state = Arc::new(AppState::new(config.clone(), tx));
+    let state = Arc::new(AppState::new(config, tx));
     let app: Router = Router::new()
         .route("/v1/events", post(handle_create_event))
-        .with_state(state);
+        .with_state(state.clone());
 
-    let addr = SocketAddr::from(([127, 0, 0, 1], config.server_port));
+    let addr = SocketAddr::from(([127, 0, 0, 1], state.config.server_port));
     println!("Server launched on {}", &addr);
 
     let listener = TcpListener::bind(addr).await?;
