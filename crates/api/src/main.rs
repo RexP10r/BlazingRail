@@ -1,6 +1,8 @@
 use anyhow::Result;
 use axum::{Router, routing::post};
 use common::{AppConfig, EventInput};
+use dotenvy::dotenv;
+use tracing_subscriber::EnvFilter;
 use std::{net::SocketAddr, sync::Arc};
 use tokio::{net::TcpListener, sync::mpsc::channel};
 
@@ -14,16 +16,28 @@ use handler::handle_create_event;
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    dotenv().ok();
+
+    tracing_subscriber::fmt()
+        .with_env_filter(EnvFilter::from_default_env())
+        .init();
+
     let config = Arc::new(AppConfig::new());
 
-    let (tx, _rx) = channel::<EventInput>(config.channel_capacity);
+    let (tx, mut rx) = channel::<EventInput>(config.channel_capacity);
 
-    let state = Arc::new(AppState::new(config, tx));
+    tokio::spawn(async move {
+        while let Some(event) = rx.recv().await {
+            tracing::debug!("Event received: {}", event.event_type);
+        }
+    });
+
+    let state = AppState::new(config.clone(), tx);
     let app: Router = Router::new()
         .route("/v1/events", post(handle_create_event))
-        .with_state(state.clone());
+        .with_state(Arc::new(state));
 
-    let addr = SocketAddr::from(([127, 0, 0, 1], state.config.server_port));
+    let addr = SocketAddr::from(([127, 0, 0, 1], config.server_port));
     println!("Server launched on {}", &addr);
 
     let listener = TcpListener::bind(addr).await?;
