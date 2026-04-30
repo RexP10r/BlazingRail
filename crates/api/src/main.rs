@@ -1,11 +1,12 @@
 use anyhow::Result;
 use axum::{Router, routing::post};
 use common::{AppConfig, EventInput};
-use dotenvy::dotenv;
 use std::env;
 use std::{net::SocketAddr, sync::Arc};
 use tokio::{net::TcpListener, sync::mpsc::channel};
-use tracing_subscriber::EnvFilter;
+use tracing_subscriber::layer::SubscriberExt;
+use tracing_subscriber::util::SubscriberInitExt;
+use tracing_subscriber::{EnvFilter, fmt};
 
 mod error;
 
@@ -17,11 +18,11 @@ use handler::handle_create_event;
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    dotenv().ok();
-
-    tracing_subscriber::fmt()
-        .json()
-        .with_env_filter(EnvFilter::from_default_env())
+    let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
+    let json_layer = fmt::layer().json();
+    tracing_subscriber::registry()
+        .with(json_layer)
+        .with(filter)
         .init();
 
     tracing::info!(
