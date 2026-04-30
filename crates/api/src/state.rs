@@ -12,7 +12,7 @@ impl AppState {
     pub fn new(config: Arc<AppConfig>, tx: Sender<EventInput>) -> Self {
         Self {
             config,
-            tx
+            tx,
         }
     }
 }
