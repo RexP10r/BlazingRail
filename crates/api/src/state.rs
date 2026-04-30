@@ -4,6 +4,7 @@ use common::{AppConfig, EventInput};
 use tokio::sync::mpsc::Sender;
 
 pub struct AppState {
+    #[allow(dead_code)]
     pub config: Arc<AppConfig>,
     pub tx: Sender<EventInput>,
 }

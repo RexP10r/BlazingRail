@@ -8,7 +8,6 @@ use common::ValidationError;
 
 
 #[derive(Debug, thiserror::Error)]
-#[allow(unused)]
 pub enum AppError {
     #[error("validation failed {0}")]
     Validation(#[from] ValidationError),
