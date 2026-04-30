@@ -7,7 +7,7 @@ use crate::{AppState, error::AppError};
 
 pub async fn handle_create_event(
     State(state): State<Arc<AppState>>,
-    Json(raw_event): Json<RawEventInput<'_>>,
+    Json(raw_event): Json<RawEventInput>,
 ) -> Result<impl IntoResponse, AppError> {
     raw_event.validate()?;
 

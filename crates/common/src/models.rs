@@ -15,13 +15,12 @@ pub enum ValidationError {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-pub struct RawEventInput<'a> {
+pub struct RawEventInput {
     pub event_type: String,
-    #[serde(borrow)]
-    pub payload: &'a RawValue,
+    pub payload: Box<RawValue>,
 }
 
-impl RawEventInput<'_> {
+impl RawEventInput {
     pub fn validate(&self) -> Result<(), ValidationError> {
         if self.payload.get().len() > 4096 {
             return Err(ValidationError::PayloadTooLarge);
