@@ -20,5 +20,7 @@ pub async fn handle_create_event(
         TrySendError::Closed(_) => AppError::Internal(anyhow::anyhow!("Channel closed")),
     })?;
 
+    tracing::info!("Received event");
+
     Ok(StatusCode::ACCEPTED)
 }
