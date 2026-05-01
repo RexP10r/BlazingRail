@@ -35,7 +35,7 @@ async fn main() -> Result<()> {
         env::var("RUST_LOG").unwrap_or_else(|_| "default".to_string())
     );
 
-    let config = Arc::new(AppConfig::new());
+    let config = AppConfig::new();
 
     let (tx, mut rx) = channel::<EventInput>(config.channel_capacity);
 
@@ -45,7 +45,7 @@ async fn main() -> Result<()> {
         }
     });
 
-    let state = AppState::new(config.clone(), tx);
+    let state = AppState::new(tx);
     let app: Router = Router::new()
         .route("/v1/events", post(handle_create_event))
         .with_state(Arc::new(state))
