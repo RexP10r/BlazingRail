@@ -1,4 +1,4 @@
-use std::net::IpAddr;
+use std::{net::IpAddr, path::PathBuf};
 
 use clap::Parser;
 
@@ -18,5 +18,24 @@ pub struct AppConfig {
 impl AppConfig {
     pub fn new() -> Self {
         AppConfig::parse()
+    }
+}
+
+#[derive(Parser, Debug)]
+#[command(version, about, long_about = None)]
+pub struct PipelineConfig {
+    #[arg(long, env = "BATCH_SIZE", default_value_t = 500)]
+    pub batch_size: usize,
+
+    #[arg(long, env = "FLUSH_TIMEOUT_MS", default_value_t = 50)]
+    pub flush_timeout_ms: u64,
+
+    #[arg(long, env = "DLQ_PATH", default_value = "/tmp/blazing_rail.jsonl")]
+    pub dlq_apth: PathBuf,
+}
+
+impl PipelineConfig {
+    pub fn new() -> Self {
+        PipelineConfig::parse()
     }
 }
