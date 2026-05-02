@@ -1,9 +1,6 @@
-use std::{
-    sync::{Arc, mpsc::Receiver},
-    time::Duration,
-};
-
 use common::{EventInput, PipelineConfig};
+use std::{sync::Arc, time::Duration};
+use tokio::sync::mpsc::Receiver;
 
 use crate::{EventSink, SinkError};
 
@@ -28,7 +25,7 @@ impl Batcher {
             timeout: Duration::from_millis(pipeline_config.flush_timeout_ms),
         }
     }
-    pub async fn run (&mut self) -> Result<(), SinkError> {
+    pub async fn run(self) -> Result<(), SinkError> {
         Ok(())
     }
 }
