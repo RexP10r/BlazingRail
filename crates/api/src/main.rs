@@ -52,8 +52,8 @@ async fn main() -> Result<()> {
     let state = AppState::new(tx);
     let app: Router = Router::new()
         .route("/v1/events", post(handle_create_event))
-        .with_state(Arc::new(state))
-        .route("/health", get(check_health));
+        .route("/health", get(check_health))
+        .with_state(Arc::new(state));
 
     let addr = SocketAddr::from((app_config.server_host, app_config.server_port));
     println!("Server launched on {}", &addr);
