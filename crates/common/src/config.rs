@@ -30,7 +30,7 @@ pub struct PipelineConfig {
     #[arg(long, env = "FLUSH_TIMEOUT_MS", default_value_t = 50)]
     pub flush_timeout_ms: u64,
 
-    #[arg(long, env = "DLQ_PATH", default_value = "/tmp/blazing_rail.jsonl")]
+    #[arg(long, env = "DLQ_PATH", default_value = "/tmp/blazingrail_dlq.jsonl")]
     pub dlq_path: PathBuf,
 }
 
