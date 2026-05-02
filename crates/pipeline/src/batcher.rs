@@ -82,9 +82,14 @@ impl Batcher {
     pub async fn run(mut self) -> Result<(), SinkError> {
         let mut state = BatcherState::new(&self);
 
-        tokio::select! {
-          msg = self.receiver.recv() => {self.handle_recv(&mut state, msg).await?;},
-          _ = &mut state.timer  => self.handle_timeout(&mut state).await?,
+        loop {
+            tokio::select! {
+              msg = self.receiver.recv() => {
+                  let is_stopping = self.handle_recv(&mut state, msg).await?;
+                  if is_stopping {break;}
+              },
+              _ = &mut state.timer  => self.handle_timeout(&mut state).await?,
+            }
         }
         Ok(())
     }
