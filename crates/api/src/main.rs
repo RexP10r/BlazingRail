@@ -1,5 +1,5 @@
 use anyhow::Result;
-use axum::{Router, routing::post, routing::get};
+use axum::{Router, routing::get, routing::post};
 use common::{AppConfig, EventInput, PipelineConfig};
 use dotenvy::dotenv;
 use pipeline::{Batcher, FileSink};
@@ -23,7 +23,7 @@ use crate::handler::check_health;
 #[tokio::main]
 async fn main() -> Result<()> {
     dotenv().ok();
-    
+
     let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
     let json_layer = fmt::layer().json();
     tracing_subscriber::registry()
@@ -43,7 +43,10 @@ async fn main() -> Result<()> {
     let sink = Arc::new(FileSink::new(pipeline_config.clone())?);
 
     let _pipeline_handle = tokio::spawn(async move {
-        Batcher::new(rx, sink, pipeline_config).run().await
+        Batcher::new(rx, sink, pipeline_config)
+            .run()
+            .await
+            .unwrap_or_else(|e| tracing::error!(error=%e, "pipeline task terminated"))
     });
 
     let state = AppState::new(tx);

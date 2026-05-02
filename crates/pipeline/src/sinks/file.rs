@@ -18,6 +18,8 @@ impl FileSink {
     pub fn new(pipeline_config: Arc<PipelineConfig>) -> Result<Self, Error> {
         let file = File::create(pipeline_config.dlq_path.clone())?;
         let buf_writer = BufWriter::with_capacity(pipeline_config.batch_size, file);
+
+        tracing::info!(path = %pipeline_config.dlq_path.display(), "FileSink initialized");
         Ok(Self {
             writer: Arc::new(Mutex::new(buf_writer)),
         })

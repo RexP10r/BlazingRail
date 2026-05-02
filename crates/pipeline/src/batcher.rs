@@ -46,7 +46,10 @@ impl BatcherState {
 impl Batcher {
     async fn flush(&self, state: &mut BatcherState) -> Result<(), SinkError> {
         let batch = take(&mut state.buffer);
-        self.event_sink.send_batch(batch).await?;
+        self.event_sink
+            .send_batch(batch)
+            .await
+            .unwrap_or_else(|e| tracing::error!(error = %e, "sink write failed"));
         state.buffer.clear();
         Ok(())
     }
