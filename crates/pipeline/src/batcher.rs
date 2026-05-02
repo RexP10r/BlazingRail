@@ -18,7 +18,7 @@ impl Batcher {
     pub fn new(
         receiver: Receiver<EventInput>,
         event_sink: Arc<dyn EventSink>,
-        pipeline_config: Arc<PipelineConfig>,
+        pipeline_config: &PipelineConfig,
     ) -> Self {
         Self {
             receiver,

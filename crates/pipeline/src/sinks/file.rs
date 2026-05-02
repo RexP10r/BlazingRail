@@ -15,7 +15,7 @@ pub struct FileSink {
 }
 
 impl FileSink {
-    pub fn new(pipeline_config: Arc<PipelineConfig>) -> Result<Self, Error> {
+    pub fn new(pipeline_config: &PipelineConfig) -> Result<Self, Error> {
         let file = File::create(pipeline_config.dlq_path.clone())?;
         let buf_writer = BufWriter::with_capacity(pipeline_config.batch_size, file);
 
@@ -31,7 +31,8 @@ impl EventSink for FileSink {
     async fn send_batch(&self, batch: Vec<EventInput>) -> Result<(), SinkError> {
         let mut guard = self.writer.lock().unwrap();
         for input in batch.into_iter() {
-            to_writer(&mut *guard, &input)?;
+            to_writer(&mut *guard, &input)
+                .unwrap_or_else(|err| tracing::error!(error = %err, "dlq write failed"));
             let _ = guard.write_all(b"\n");
         }
         let _ = guard.flush();
