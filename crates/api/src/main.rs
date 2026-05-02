@@ -1,7 +1,8 @@
 use anyhow::Result;
 use axum::{Router, routing::post, routing::get};
-use common::{AppConfig, EventInput};
+use common::{AppConfig, EventInput, PipelineConfig};
 use dotenvy::dotenv;
+use pipeline::{Batcher, FileSink};
 use std::env;
 use std::{net::SocketAddr, sync::Arc};
 use tokio::{net::TcpListener, sync::mpsc::channel};
@@ -35,14 +36,14 @@ async fn main() -> Result<()> {
         env::var("RUST_LOG").unwrap_or_else(|_| "default".to_string())
     );
 
-    let config = AppConfig::new();
+    let app_config = AppConfig::new();
+    let pipeline_config = Arc::new(PipelineConfig::new());
 
-    let (tx, mut rx) = channel::<EventInput>(config.channel_capacity);
+    let (tx, rx) = channel::<EventInput>(app_config.channel_capacity);
+    let sink = Arc::new(FileSink::new(pipeline_config.clone())?);
 
-    tokio::spawn(async move {
-        while let Some(event) = rx.recv().await {
-            tracing::debug!("Event received: {}", event.event_type);
-        }
+    let _pipeline_handle = tokio::spawn(async move {
+        Batcher::new(rx, sink, pipeline_config).run().await
     });
 
     let state = AppState::new(tx);
@@ -51,7 +52,7 @@ async fn main() -> Result<()> {
         .with_state(Arc::new(state))
         .route("/health", get(check_health));
 
-    let addr = SocketAddr::from((config.server_host, config.server_port));
+    let addr = SocketAddr::from((app_config.server_host, app_config.server_port));
     println!("Server launched on {}", &addr);
 
     let listener = TcpListener::bind(addr).await?;
