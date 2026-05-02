@@ -11,6 +11,12 @@ pub enum SinkError {
 
     #[error("Channel is closed")]
     ChannelClosed,
+
+    #[error("Mutex poisoned")]
+    MutexPoisoned,
+
+    #[error("Blocking task failed: {0}")]
+    TaskFailed(String),
 }
 
 #[async_trait]

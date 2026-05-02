@@ -29,13 +29,22 @@ impl FileSink {
 #[async_trait]
 impl EventSink for FileSink {
     async fn send_batch(&self, batch: Vec<EventInput>) -> Result<(), SinkError> {
-        let mut guard = self.writer.lock().unwrap();
-        for input in batch.into_iter() {
-            to_writer(&mut *guard, &input)
-                .unwrap_or_else(|err| tracing::error!(error = %err, "dlq write failed"));
-            let _ = guard.write_all(b"\n");
+        let writer = Arc::clone(&self.writer);
+
+        let result = tokio::task::spawn_blocking(move || {
+          let mut guard = writer.lock().map_err(|_| SinkError::MutexPoisoned)?;
+          for input in batch {
+              to_writer(&mut *guard, &input)?;
+              let _ = guard.write_all(b"\n");
+          }
+          guard.flush()?;
+          Ok::<_, SinkError>(())
+        }).await;
+
+        match result {
+            Ok(Ok(())) => Ok(()),
+            Ok(Err(e)) => Err(e),
+            Err(join_err) => Err(SinkError::TaskFailed(join_err.to_string()))
         }
-        let _ = guard.flush();
-        Ok(())
     }
 }
