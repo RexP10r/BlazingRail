@@ -4,3 +4,4 @@ pub mod sinks;
 
 pub use sink::{EventSink, SinkError};
 pub use batcher::Batcher;
+pub use sinks::FileSink;
