@@ -5,6 +5,7 @@ use dotenvy::dotenv;
 use pipeline::{Batcher, FileSink};
 use std::env;
 use std::{net::SocketAddr, sync::Arc};
+use tokio::signal::ctrl_c;
 use tokio::{net::TcpListener, sync::mpsc::channel};
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
@@ -38,17 +39,18 @@ async fn main() -> Result<()> {
 
     let config = Config::new();
 
-    let (tx, rx) = channel::<EventInput>(config.app.channel_capacity);
+    let (tx_main, rx) = channel::<EventInput>(config.app.channel_capacity);
+    let tx_app = tx_main.clone();
     let sink = Arc::new(FileSink::new(&config.pipeline)?);
 
-    let _pipeline_handle = tokio::spawn(async move {
+    let pipeline_handle = tokio::spawn(async move {
         Batcher::new(rx, sink, &config.pipeline)
             .run()
             .await
-            .unwrap_or_else(|e| tracing::error!(error=%e, "pipeline task terminated"))
+            .inspect_err(|e| tracing::error!(error=%e, "pipeline task terminated"))
     });
 
-    let state = AppState::new(tx);
+    let state = AppState::new(tx_app);
     let app: Router = Router::new()
         .route("/v1/events", post(handle_create_event))
         .route("/health", get(check_health))
@@ -58,7 +60,25 @@ async fn main() -> Result<()> {
     println!("Server launched on {}", &addr);
 
     let listener = TcpListener::bind(addr).await?;
-    axum::serve(listener, app).await?;
+    let shutdown_signal = async {
+        if let Err(e) = ctrl_c().await {
+            tracing::error!(error = %e, "failed to wait for shutdown signal");
+        }
+    };
+
+    axum::serve(listener, app)
+        .with_graceful_shutdown(shutdown_signal)
+        .await?;
+
+    drop(tx_main);
+
+    match pipeline_handle.await {
+        Ok(Ok(())) => tracing::info!("pipeline shutdown complete"),
+        Ok(Err(e)) => tracing::error!(error=%e, "pipeline returned error on shutdown"),
+        Err(e) => tracing::error!(error=%e, "pipeline task panicked"),
+    }
+
+    tracing::info!("Application shutdown complete");
 
     Ok(())
 }
