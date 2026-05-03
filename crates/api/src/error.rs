@@ -15,8 +15,8 @@ pub enum AppError {
     #[error("queue is full, backpressure applied")]
     Backpressure,
 
-    #[error("internal server error {0}")]
-    Internal(#[from] anyhow::Error),
+    #[error("internal server error")]
+    Internal,
 
     #[error("invalid json payload")]
     JsonParse(#[from] serde_json::Error),
@@ -40,10 +40,10 @@ impl IntoResponse for AppError {
                 "System Overloaded",
                 "Event queue is full. Retry later".into(),
             ),
-            AppError::Internal(e) => (
+            AppError::Internal => (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 "Internal Error",
-                e.to_string(),
+                "Channel Closed".into(),
             ),
             AppError::JsonParse(e) => (
                 StatusCode::BAD_REQUEST,
@@ -52,7 +52,7 @@ impl IntoResponse for AppError {
             )
         };
         let body = Json(AppErrorResponse {
-            type_: format!("https://api.blazingrail.dev/errors{}", status.as_str()),
+            type_: format!("https://api.blazingrail.dev/errors/{}", status.as_str()),
             title: title.into(),
             status: status.as_u16(),
             details: detail,

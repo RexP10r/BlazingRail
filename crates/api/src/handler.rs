@@ -17,7 +17,7 @@ pub async fn handle_create_event(
 
     state.tx.try_send(event_input).map_err(|err| match err {
         TrySendError::Full(_) => AppError::Backpressure,
-        TrySendError::Closed(_) => AppError::Internal(anyhow::anyhow!("Channel closed")),
+        TrySendError::Closed(_) => AppError::Internal,
     })?;
 
     tracing::debug!("Event validated");
