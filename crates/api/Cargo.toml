@@ -4,15 +4,17 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+common = { path = "../common" }
+pipeline = { path = "../pipeline" }
+
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+
 anyhow = "1.0.102"
 axum = "0.8.9"
-serde_json = "1.0.149"
-thiserror = "2.0.18"
-tokio = {version = "1.52.1", features = ["full"]}
-serde = {version = "1.0.228", features = ["derive"]}
-common = {path = "../common"}
-pipeline = {path = "../pipeline"}
 json_size = "0.2.2"
-tracing = "0.1.44"
-tracing-subscriber = {version = "0.3.23", features=["env-filter", "json"]}
+tracing-subscriber = { version = "0.3.23", features = ["env-filter", "json"] }
 dotenvy = "0.15.7"
