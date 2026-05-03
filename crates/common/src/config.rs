@@ -18,13 +18,13 @@ pub struct AppConfig {
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
 pub struct PipelineConfig {
-    #[arg(long, env = "BATCH_SIZE", default_value_t = 500)]
+    #[arg(long, env = "BATCH_SIZE", default_value_t = 256)]
     pub batch_size: usize,
 
     #[arg(long, env = "BATCH_CAPACITY", default_value_t = 4096)]
     pub batch_capacity: usize,
 
-    #[arg(long, env = "FLUSH_TIMEOUT_MS", default_value_t = 50)]
+    #[arg(long, env = "FLUSH_TIMEOUT_MS", default_value_t = 64)]
     pub flush_timeout_ms: u64,
 
     #[arg(long, env = "DLQ_PATH", default_value = "/tmp/blazingrail_dlq.jsonl")]
