@@ -20,7 +20,7 @@ impl FileSink {
             .create(true)
             .append(true)
             .open(pipeline_config.dlq_path.clone())?;
-        let buf_writer = BufWriter::with_capacity(pipeline_config.batch_size, file);
+        let buf_writer = BufWriter::with_capacity(pipeline_config.batch_capacity, file);
 
         tracing::info!(path = %pipeline_config.dlq_path.display(), "FileSink initialized");
         Ok(Self {

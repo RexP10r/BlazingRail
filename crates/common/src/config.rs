@@ -21,6 +21,9 @@ pub struct PipelineConfig {
     #[arg(long, env = "BATCH_SIZE", default_value_t = 500)]
     pub batch_size: usize,
 
+    #[arg(long, env = "BATCH_CAPACITY", default_value_t = 4096)]
+    pub batch_capacity: usize,
+
     #[arg(long, env = "FLUSH_TIMEOUT_MS", default_value_t = 50)]
     pub flush_timeout_ms: u64,
 
