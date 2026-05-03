@@ -1,5 +1,5 @@
 use common::{EventInput, PipelineConfig};
-use std::{mem::take, pin::Pin, sync::Arc, time::Duration};
+use std::{mem::replace, pin::Pin, sync::Arc, time::Duration};
 use tokio::{
     sync::mpsc::Receiver,
     time::{Instant, Sleep, sleep},
@@ -45,12 +45,11 @@ impl BatcherState {
 
 impl Batcher {
     async fn flush(&self, state: &mut BatcherState) -> Result<(), SinkError> {
-        let batch = take(&mut state.buffer);
+        let batch = replace(&mut state.buffer, Vec::with_capacity(self.capacity));
         self.event_sink
             .send_batch(batch)
             .await
-            .unwrap_or_else(|e| tracing::error!(error = %e, "sink write failed"));
-        state.buffer.clear();
+            .inspect_err(|e| tracing::error!(error = %e, "sink write failed"))?;
         Ok(())
     }
     async fn handle_recv(
