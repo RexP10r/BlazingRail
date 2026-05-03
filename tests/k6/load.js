@@ -46,16 +46,3 @@ export default function () {
     'handled': (r) => r.status === 202 || r.status === 400 || r.status === 503,
   });
 }
-
-export function handleSummary(data) {
-  const m = data.metrics;
-  const c202 = m.http_202_total?.values?.count ?? 0;
-  const c503 = m.http_503_total?.values?.count ?? 0;
-  const p95 = m.latency_p95_ms?.values?.['p(95)']?.toFixed(2) ?? 'N/A';
-
-  return {
-    stdout: `\n=== RESULTS ===
-202: ${c202}, 503: ${c503}, p95: ${p95}ms, DLQ: ${dlq} lines
-`,
-  };
-}
