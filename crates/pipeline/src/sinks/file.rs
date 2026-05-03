@@ -1,5 +1,5 @@
 use std::{
-    fs::File,
+    fs::{File, OpenOptions},
     io::{BufWriter, Error, Write},
     sync::{Arc, Mutex},
 };
@@ -16,7 +16,10 @@ pub struct FileSink {
 
 impl FileSink {
     pub fn new(pipeline_config: &PipelineConfig) -> Result<Self, Error> {
-        let file = File::create(pipeline_config.dlq_path.clone())?;
+        let file = OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(pipeline_config.dlq_path.clone())?;
         let buf_writer = BufWriter::with_capacity(pipeline_config.batch_size, file);
 
         tracing::info!(path = %pipeline_config.dlq_path.display(), "FileSink initialized");
@@ -32,19 +35,20 @@ impl EventSink for FileSink {
         let writer = Arc::clone(&self.writer);
 
         let result = tokio::task::spawn_blocking(move || {
-          let mut guard = writer.lock().map_err(|_| SinkError::MutexPoisoned)?;
-          for input in batch {
-              to_writer(&mut *guard, &input)?;
-              let _ = guard.write_all(b"\n");
-          }
-          guard.flush()?;
-          Ok::<_, SinkError>(())
-        }).await;
+            let mut guard = writer.lock().map_err(|_| SinkError::MutexPoisoned)?;
+            for input in batch {
+                to_writer(&mut *guard, &input)?;
+                let _ = guard.write_all(b"\n");
+            }
+            guard.flush()?;
+            Ok::<_, SinkError>(())
+        })
+        .await;
 
         match result {
             Ok(Ok(())) => Ok(()),
             Ok(Err(e)) => Err(e),
-            Err(join_err) => Err(SinkError::TaskFailed(join_err.to_string()))
+            Err(join_err) => Err(SinkError::TaskFailed(join_err.to_string())),
         }
     }
 }
