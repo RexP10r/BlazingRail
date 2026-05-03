@@ -15,12 +15,6 @@ pub struct AppConfig {
     pub channel_capacity: usize,
 }
 
-impl AppConfig {
-    pub fn new() -> Self {
-        AppConfig::parse()
-    }
-}
-
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
 pub struct PipelineConfig {
@@ -34,8 +28,17 @@ pub struct PipelineConfig {
     pub dlq_path: PathBuf,
 }
 
-impl PipelineConfig {
+#[derive(Parser, Debug)]
+pub struct Config {
+    #[command(flatten)]
+    pub app: AppConfig,
+
+    #[command(flatten)]
+    pub pipeline: PipelineConfig,
+}
+
+impl Config {
     pub fn new() -> Self {
-        PipelineConfig::parse()
+        Self::parse()
     }
 }

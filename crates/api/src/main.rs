@@ -1,6 +1,6 @@
 use anyhow::Result;
 use axum::{Router, routing::get, routing::post};
-use common::{AppConfig, EventInput, PipelineConfig};
+use common::{Config, EventInput};
 use dotenvy::dotenv;
 use pipeline::{Batcher, FileSink};
 use std::env;
@@ -36,14 +36,13 @@ async fn main() -> Result<()> {
         env::var("RUST_LOG").unwrap_or_else(|_| "default".to_string())
     );
 
-    let app_config = AppConfig::new();
-    let pipeline_config = PipelineConfig::new();
+    let config = Config::new();
 
-    let (tx, rx) = channel::<EventInput>(app_config.channel_capacity);
-    let sink = Arc::new(FileSink::new(&pipeline_config)?);
+    let (tx, rx) = channel::<EventInput>(config.app.channel_capacity);
+    let sink = Arc::new(FileSink::new(&config.pipeline)?);
 
     let _pipeline_handle = tokio::spawn(async move {
-        Batcher::new(rx, sink, &pipeline_config)
+        Batcher::new(rx, sink, &config.pipeline)
             .run()
             .await
             .unwrap_or_else(|e| tracing::error!(error=%e, "pipeline task terminated"))
@@ -55,7 +54,7 @@ async fn main() -> Result<()> {
         .route("/health", get(check_health))
         .with_state(Arc::new(state));
 
-    let addr = SocketAddr::from((app_config.server_host, app_config.server_port));
+    let addr = SocketAddr::from((config.app.server_host, config.app.server_port));
     println!("Server launched on {}", &addr);
 
     let listener = TcpListener::bind(addr).await?;
