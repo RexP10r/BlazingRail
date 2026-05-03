@@ -38,7 +38,7 @@ impl EventSink for FileSink {
             let mut guard = writer.lock().map_err(|_| SinkError::MutexPoisoned)?;
             for input in batch {
                 to_writer(&mut *guard, &input)?;
-                let _ = guard.write_all(b"\n");
+                guard.write_all(b"\n")?;
             }
             guard.flush()?;
             Ok::<_, SinkError>(())

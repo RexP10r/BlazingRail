@@ -34,7 +34,7 @@ async fn main() -> Result<()> {
 
     tracing::info!(
         "Telemetry initialized. Log level: {}",
-        env::var("RUST_LOG").unwrap_or_else(|_| "default".to_string())
+        env::var("RUST_LOG").unwrap_or_else(|_| "info".to_string())
     );
 
     let config = Config::new();
@@ -57,7 +57,7 @@ async fn main() -> Result<()> {
         .with_state(Arc::new(state));
 
     let addr = SocketAddr::from((config.app.server_host, config.app.server_port));
-    println!("Server launched on {}", &addr);
+    tracing::info!("Server launched on {}", &addr);
 
     let listener = TcpListener::bind(addr).await?;
     let shutdown_signal = async {

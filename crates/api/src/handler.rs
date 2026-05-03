@@ -21,8 +21,6 @@ pub async fn handle_create_event(
         TrySendError::Closed(_) => AppError::Internal,
     })?;
 
-    tracing::debug!("Event validated");
-
     Ok(StatusCode::ACCEPTED)
 }
 
