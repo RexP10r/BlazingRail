@@ -14,6 +14,12 @@ pub enum SinkError {
 
     #[error("Blocking task failed: {0}")]
     TaskFailed(String),
+
+    #[error("Kafka publish failed: {0}")]
+    KafkaPublish(String),
+    
+    #[error("Batch send timeout")]
+    Timeout,
 }
 
 #[async_trait]

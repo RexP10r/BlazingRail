@@ -42,9 +42,6 @@ pub struct PipelineConfig {
     #[arg(long, env = "KAFKA_TOPIC", default_value = "blazingrail-events")]
     pub kafka_topic: String,
 
-    #[arg(long, env = "KAFKA_KEY_FIELD", default_value = "event_type")]
-    pub kafka_key_field: String,
-    
     #[arg(long, env = "KAFKA_COMPRESSION", default_value = "lz4")]
     pub kafka_compression: String,
 }
