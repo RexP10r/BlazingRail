@@ -1,14 +1,16 @@
 #![allow(dead_code)]
 use std::time::Duration;
 
-use common::PipelineConfig;
+use common::{EventInput, PipelineConfig};
 use rdkafka::{ClientConfig, error::KafkaError, producer::FutureProducer};
+
+use crate::{EventSink, SinkError};
 
 pub struct KafkaSink {
     producer: FutureProducer,
     topic: String,
     timeout: Duration,
-    key_field: Option<String>,
+    key_field: String,
 }
 
 impl KafkaSink {
@@ -34,11 +36,13 @@ impl KafkaSink {
             producer: producer,
             topic: pipeline_config.kafka_topic.clone(),
             timeout: Duration::from_millis(pipeline_config.kafka_timeout_ms),
-            key_field: if pipeline_config.kafka_key_field.is_empty() {
-                None
-            } else {
-                Some(pipeline_config.kafka_key_field.clone())
-            },
+            key_field: pipeline_config.kafka_key_field.clone(),
         })
+    }
+}
+
+impl EventSink for KafkaSink {
+    async fn send_batch(&self, _batch: Vec<EventInput>) -> Result<(), SinkError> {
+        todo!()
     }
 }
