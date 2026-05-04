@@ -6,6 +6,14 @@ use axum::{
 use serde::Serialize;
 use common::ValidationError;
 
+#[derive(Debug, thiserror::Error)]
+pub enum InitError {
+    #[error("Kafka config failed: {0}")]
+    Kafka(#[from] rdkafka::error::KafkaError),
+
+    #[error("File I/O failed: {0}")]
+    Io(#[from] std::io::Error),
+}
 
 #[derive(Debug, thiserror::Error)]
 pub enum AppError {

@@ -1,8 +1,8 @@
 use anyhow::Result;
 use axum::{Router, routing::get, routing::post};
-use common::{Config, EventInput};
+use common::{Config, EventInput, PipelineConfig};
 use dotenvy::dotenv;
-use pipeline::{Batcher, FileSink};
+use pipeline::{Batcher, EventSink, FileSink, KafkaSink};
 use std::env;
 use std::{net::SocketAddr, sync::Arc};
 use tokio::signal::ctrl_c;
@@ -12,6 +12,7 @@ use tracing_subscriber::util::SubscriberInitExt;
 use tracing_subscriber::{EnvFilter, fmt};
 
 mod error;
+use error::InitError;
 
 mod state;
 use state::AppState;
@@ -20,6 +21,17 @@ mod handler;
 use handler::handle_create_event;
 
 use crate::handler::check_health;
+
+fn init_sink(pipeline_config: &PipelineConfig) -> Result<Arc<dyn EventSink>, InitError> {
+    let sink: Arc<dyn EventSink> = if pipeline_config.enable_kafka {
+        let kafka = KafkaSink::new(pipeline_config)?;
+        Arc::new(kafka)
+    } else {
+        let file = FileSink::new(pipeline_config)?; 
+        Arc::new(file)
+    };
+    Ok(sink)
+}
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -42,7 +54,7 @@ async fn main() -> Result<()> {
     let (tx_main, rx) = channel::<EventInput>(config.app.channel_capacity);
     let tx_app = tx_main.clone();
     
-    let sink = Arc::new(FileSink::new(&config.pipeline)?);
+    let sink = init_sink(&config.pipeline)?;
     let batcher = Batcher::new(rx, sink, &config.pipeline);
 
     let pipeline_handle = tokio::spawn(async move {
