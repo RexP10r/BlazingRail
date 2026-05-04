@@ -19,10 +19,10 @@ impl FileSink {
         let file = OpenOptions::new()
             .create(true)
             .append(true)
-            .open(pipeline_config.dlq_path.clone())?;
+            .open(pipeline_config.prime_path.clone())?;
         let buf_writer = BufWriter::with_capacity(pipeline_config.batch_capacity, file);
 
-        tracing::info!(path = %pipeline_config.dlq_path.display(), "FileSink initialized");
+        tracing::info!(path = %pipeline_config.prime_path.display(), "FileSink initialized");
         Ok(Self {
             writer: Arc::new(Mutex::new(buf_writer)),
         })
