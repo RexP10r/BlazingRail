@@ -27,8 +27,26 @@ pub struct PipelineConfig {
     #[arg(long, env = "FLUSH_TIMEOUT_MS", default_value_t = 64)]
     pub flush_timeout_ms: u64,
 
-    #[arg(long, env = "DLQ_PATH", default_value = "/tmp/blazingrail_dlq.jsonl")]
-    pub dlq_path: PathBuf,
+    #[arg(long, env = "PRIME_PATH", default_value = "/dev/null")]
+    pub prime_path: PathBuf,
+    
+    #[arg(long, env = "ENABLE_KAFKA", default_value_t = false)]
+    pub enable_kafka: bool,
+
+    #[arg(long, env = "KAFKA_BROKERS", default_value = "localhost:9092")]
+    pub kafka_brokers: String,
+
+    #[arg(long, env = "KAFKA_TIMEOUT", default_value_t = 4096)]
+    pub kafka_timeout_ms: u64,
+
+    #[arg(long, env = "KAFKA_TOPIC", default_value = "blazingrail-events")]
+    pub kafka_topic: String,
+
+    #[arg(long, env = "KAFKA_KEY_FIELD", default_value = "")]
+    pub kafka_key_field: String,  // Empty string → None
+    
+    #[arg(long, env = "KAFKA_COMPRESSION", default_value = "lz4")]
+    pub kafka_compression: String,
 }
 
 #[derive(Parser, Debug)]

@@ -41,10 +41,12 @@ async fn main() -> Result<()> {
 
     let (tx_main, rx) = channel::<EventInput>(config.app.channel_capacity);
     let tx_app = tx_main.clone();
+    
     let sink = Arc::new(FileSink::new(&config.pipeline)?);
+    let batcher = Batcher::new(rx, sink, &config.pipeline);
 
     let pipeline_handle = tokio::spawn(async move {
-        Batcher::new(rx, sink, &config.pipeline)
+        batcher
             .run()
             .await
             .inspect_err(|e| tracing::error!(error=%e, "pipeline task terminated"))
