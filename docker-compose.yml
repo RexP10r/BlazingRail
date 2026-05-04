@@ -14,8 +14,8 @@ services:
       - "3000:3000"
     env_file: .env
     environment:
-      - SERVER_HOST=0.0.0.0          # ← Critical fix
-      - KAFKA_BROKERS=kafka:9092     # ← Critical fix
+      - SERVER_HOST=0.0.0.0
+      - KAFKA_BROKERS=kafka:9092
       - RUST_LOG=info
     depends_on:
       kafka:
