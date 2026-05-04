@@ -1,0 +1,9 @@
+target/
+**/target/
+*.log
+*.rs
+Cargo.lock
+!.cargo/config.toml
+tests/
+.git/
+

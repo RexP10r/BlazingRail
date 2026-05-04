@@ -3,6 +3,10 @@ name = "api"
 version = "0.1.0"
 edition = "2024"
 
+[[bin]]
+name = "api"
+path = "src/main.rs"
+
 [dependencies]
 common = { path = "../common" }
 pipeline = { path = "../pipeline" }
