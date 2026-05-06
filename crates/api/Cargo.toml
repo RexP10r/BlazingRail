@@ -23,3 +23,4 @@ json_size = "0.2.2"
 tracing-subscriber = { version = "0.3.23", features = ["env-filter", "json"] }
 dotenvy = "0.15.7"
 rdkafka = "0.39.0"
+socket2 = "0.6.3"

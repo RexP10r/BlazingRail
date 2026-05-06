@@ -11,6 +11,8 @@ use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 use tracing_subscriber::{EnvFilter, fmt};
 
+use socket2::{Domain, Socket, Type};
+
 mod error;
 use error::InitError;
 
@@ -27,13 +29,13 @@ fn init_sink(pipeline_config: &PipelineConfig) -> Result<Arc<dyn EventSink>, Ini
         let kafka = KafkaSink::new(pipeline_config)?;
         Arc::new(kafka)
     } else {
-        let file = FileSink::new(pipeline_config)?; 
+        let file = FileSink::new(pipeline_config)?;
         Arc::new(file)
     };
     Ok(sink)
 }
 
-#[tokio::main(flavor = "multi_thread", worker_threads = 12)]
+#[tokio::main]
 async fn main() -> Result<()> {
     dotenv().ok();
 
@@ -53,7 +55,7 @@ async fn main() -> Result<()> {
 
     let (tx_main, rx) = channel::<EventInput>(config.app.channel_capacity);
     let tx_app = tx_main.clone();
-    
+
     let sink = init_sink(&config.pipeline)?;
     let batcher = Batcher::new(rx, sink, &config.pipeline);
 
@@ -73,7 +75,15 @@ async fn main() -> Result<()> {
     let addr = SocketAddr::from((config.app.server_host, config.app.server_port));
     tracing::info!("Server launched on {}", &addr);
 
-    let listener = TcpListener::bind(addr).await?;
+    let socket = Socket::new(Domain::IPV4, Type::STREAM, None)?;
+    socket.set_reuse_address(true)?;
+    socket.set_nonblocking(true)?; 
+
+    socket.bind(&addr.into())?;   
+    socket.listen(config.app.socket_max_connections)?;
+    
+    let std_listener = std::net::TcpListener::from(socket);
+    let listener = TcpListener::from_std(std_listener)?;
     let shutdown_signal = async {
         if let Err(e) = ctrl_c().await {
             tracing::error!(error = %e, "failed to wait for shutdown signal");

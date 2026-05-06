@@ -13,7 +13,6 @@ use crate::{EventSink, SinkError};
 
 pub struct KafkaSink {
     producer: FutureProducer,
-    topic: String,
     timeout: Duration,
 }
 
@@ -38,7 +37,6 @@ impl KafkaSink {
 
         Ok(Self {
             producer: producer,
-            topic: pipeline_config.kafka_topic.clone(),
             timeout: Duration::from_millis(pipeline_config.kafka_timeout_ms),
         })
     }
@@ -47,22 +45,26 @@ impl KafkaSink {
 #[async_trait]
 impl EventSink for KafkaSink {
     async fn send_batch(&self, batch: Vec<EventInput>) -> Result<(), SinkError> {
-        let result = tokio::time::timeout(self.timeout, async {
-            for input in batch {
-                let field_key = input.event_type.as_bytes();
-                let payload = serde_json::to_vec(&input.payload)?;
-                let record = FutureRecord::to(&self.topic)
-                    .payload(&payload)
-                    .key(field_key);
-                let delivery_status = self.producer.send(record, Duration::from_millis(128)).await;
+        let result = tokio::time::timeout(
+            Duration::from_millis(self.timeout.as_millis() as u64 + 2048),
+            async {
+                for input in batch {
+                    let field_key = input.event_type.as_bytes();
+                    let payload = serde_json::to_vec(&input.payload)?;
+                    let record = FutureRecord::to(&input.event_type)
+                        .payload(&payload)
+                        .key(field_key);
+                    let delivery_status =
+                        self.producer.send(record, Duration::from_millis(32)).await;
 
-                match delivery_status {
-                    Err((e, _)) => tracing::warn!("Kafka delivering failed: {}", e),
-                    _ => continue,
-                };
-            }
-            Ok::<_, SinkError>(())
-        })
+                    match delivery_status {
+                        Err((e, _)) => tracing::warn!("Kafka delivering failed: {}", e),
+                        _ => continue,
+                    };
+                }
+                Ok::<_, SinkError>(())
+            },
+        )
         .await;
         match result {
             Ok(Ok(())) => Ok(()),

@@ -5,7 +5,7 @@ use clap::Parser;
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
 pub struct AppConfig {
-    #[arg(long, env = "SERVER_HOST", default_value = "127.0.0.1")]
+    #[arg(long, env = "SERVER_HOST", default_value = "0.0.0.0")]
     pub server_host: IpAddr,
 
     #[arg(long, env = "SERVER_PORT", default_value_t = 3000)]
@@ -13,6 +13,9 @@ pub struct AppConfig {
 
     #[arg(long, env = "CHANNEL_CAPACITY", default_value_t = 4096)]
     pub channel_capacity: usize,
+
+    #[arg(long, env = "SOCKET_MAX_CONNECTIONS", default_value_t = 1024)]
+    pub socket_max_connections: i32,
 }
 
 #[derive(Parser, Debug)]
@@ -33,14 +36,11 @@ pub struct PipelineConfig {
     #[arg(long, env = "ENABLE_KAFKA", default_value_t = false)]
     pub enable_kafka: bool,
 
-    #[arg(long, env = "KAFKA_BROKERS", default_value = "localhost:9092")]
+    #[arg(long, env = "KAFKA_BROKERS", default_value = "0.0.0.0:9092")]
     pub kafka_brokers: String,
 
-    #[arg(long, env = "KAFKA_TIMEOUT", default_value_t = 4096)]
+    #[arg(long, env = "KAFKA_TIMEOUT", default_value_t = 8132)]
     pub kafka_timeout_ms: u64,
-
-    #[arg(long, env = "KAFKA_TOPIC", default_value = "blazingrail-events")]
-    pub kafka_topic: String,
 
     #[arg(long, env = "KAFKA_COMPRESSION", default_value = "lz4")]
     pub kafka_compression: String,
