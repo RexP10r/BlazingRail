@@ -83,14 +83,25 @@ impl Batcher {
     }
     pub async fn run(mut self) -> Result<(), SinkError> {
         let mut state = BatcherState::new(&self);
-
         loop {
             tokio::select! {
-              msg = self.receiver.recv() => {
-                  let is_stopping = self.handle_recv(&mut state, msg).await?;
-                  if is_stopping {break;}
-              },
-              _ = &mut state.timer  => self.handle_timeout(&mut state).await?,
+                msg = self.receiver.recv() => {
+                    match self.handle_recv(&mut state, msg).await {
+                        Ok(true) => break,
+                        Ok(false) => {}
+                        Err(e) => {
+                            tracing::error!(error = %e, "sink error, dropping batch and continuing");
+                            state.buffer.clear();
+                            state.timer.as_mut().reset(Instant::now() + self.timeout);
+                        }
+                    }
+                },
+                _ = &mut state.timer => {
+                    if let Err(e) = self.handle_timeout(&mut state).await {
+                        tracing::error!(error = %e, "timeout flush failed");
+                        state.buffer.clear();
+                    }
+                }
             }
         }
         Ok(())

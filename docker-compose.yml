@@ -5,9 +5,8 @@ services:
       dockerfile: Dockerfile
     env_file: .env
     environment:
-      - SERVER_HOST=0.0.0.0
-      - KAFKA_BROKERS=127.0.0.1:9092
       - RUST_LOG=info
+      - ENABLE_KAFKA=false
     depends_on:
       kafka:
         condition: service_healthy

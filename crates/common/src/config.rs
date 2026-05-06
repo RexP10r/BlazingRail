@@ -21,13 +21,13 @@ pub struct AppConfig {
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
 pub struct PipelineConfig {
-    #[arg(long, env = "BATCH_SIZE", default_value_t = 256)]
+    #[arg(long, env = "BATCH_SIZE", default_value_t = 1024)]
     pub batch_size: usize,
 
-    #[arg(long, env = "BATCH_CAPACITY", default_value_t = 4096)]
+    #[arg(long, env = "BATCH_CAPACITY", default_value_t = 16384)]
     pub batch_capacity: usize,
 
-    #[arg(long, env = "FLUSH_TIMEOUT_MS", default_value_t = 64)]
+    #[arg(long, env = "FLUSH_TIMEOUT_MS", default_value_t = 128)]
     pub flush_timeout_ms: u64,
 
     #[arg(long, env = "PRIME_PATH", default_value = "/dev/null")]
@@ -36,10 +36,10 @@ pub struct PipelineConfig {
     #[arg(long, env = "ENABLE_KAFKA", default_value_t = false)]
     pub enable_kafka: bool,
 
-    #[arg(long, env = "KAFKA_BROKERS", default_value = "0.0.0.0:9092")]
+    #[arg(long, env = "KAFKA_BROKERS", default_value = "127.0.0.1:9092")]
     pub kafka_brokers: String,
 
-    #[arg(long, env = "KAFKA_TIMEOUT", default_value_t = 8132)]
+    #[arg(long, env = "KAFKA_TIMEOUT_MS", default_value_t = 16384)]
     pub kafka_timeout_ms: u64,
 
     #[arg(long, env = "KAFKA_COMPRESSION", default_value = "lz4")]
