@@ -1,6 +1,11 @@
-use std::{net::IpAddr, path::PathBuf};
+use std::{
+    collections::HashMap,
+    net::IpAddr,
+    path::{Path, PathBuf},
+};
 
 use clap::Parser;
+use serde::Deserialize;
 
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
@@ -18,6 +23,19 @@ pub struct AppConfig {
     pub socket_max_connections: i32,
 }
 
+#[derive(Deserialize, Debug)]
+pub struct KafkaRoutingConfig {
+    pub default_topic: String,
+    #[serde(default)]
+    pub topic_mapping: HashMap<String, String>,
+}
+
+pub fn load_kafka_routing(config_path: Option<&Path>) -> Option<KafkaRoutingConfig> {
+    config_path
+        .map(|p| std::fs::read_to_string(p))
+        .and_then(|c| serde_yaml::from_str(&c.unwrap()).ok())
+}
+
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
 pub struct PipelineConfig {
@@ -32,9 +50,16 @@ pub struct PipelineConfig {
 
     #[arg(long, env = "PRIME_PATH", default_value = "/dev/null")]
     pub prime_path: PathBuf,
-    
+
     #[arg(long, env = "ENABLE_KAFKA", default_value_t = false)]
     pub enable_kafka: bool,
+
+    #[arg(
+        long,
+        env = "KAFKA_ROUTING_CONF_PATH",
+        default_value = "kafka_routing.yaml"
+    )]
+    pub kafka_routing_conf_path: String,
 
     #[arg(long, env = "KAFKA_BROKERS", default_value = "127.0.0.1:9092")]
     pub kafka_brokers: String,
@@ -45,11 +70,11 @@ pub struct PipelineConfig {
     #[arg(long, env = "KAFKA_COMPRESSION", default_value = "lz4")]
     pub kafka_compression: String,
 
-    #[arg(long, env = "CIRCUIT_BREAKER_THRESHOLD", default_value_t=2)]
+    #[arg(long, env = "CIRCUIT_BREAKER_THRESHOLD", default_value_t = 2)]
     pub circuit_breaker_threshold: usize,
 
-    #[arg(long, env = "CIRCUIT_BREAKER_TIMEOUT", default_value_t=2048)]
-    pub circuit_breaker_timeout: u64
+    #[arg(long, env = "CIRCUIT_BREAKER_TIMEOUT", default_value_t = 2048)]
+    pub circuit_breaker_timeout: u64,
 }
 
 #[derive(Parser, Debug)]
