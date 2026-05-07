@@ -6,7 +6,7 @@ use axum::{
 };
 use axum_prometheus::metrics_exporter_prometheus::PrometheusHandle;
 use common::EventInput;
-use std::sync::Arc;
+use std::{sync::Arc, time::Instant};
 use tokio::sync::mpsc::error::TrySendError;
 
 use crate::{AppState, error::AppError};
@@ -15,12 +15,18 @@ pub async fn handle_create_event(
     State(state): State<Arc<AppState>>,
     Json(input_event): Json<EventInput>,
 ) -> Result<impl IntoResponse, AppError> {
+    let start = Instant::now();
     input_event.validate()?;
 
     state.tx.try_send(input_event).map_err(|err| match err {
         TrySendError::Full(_) => AppError::Backpressure,
         TrySendError::Closed(_) => AppError::Internal,
     })?;
+    let duration = start.elapsed();
+    metrics::histogram!("blazingrail_handle_event_duration").record(duration.as_secs_f64());
+
+    let depth_value = (state.tx.max_capacity() - state.tx.capacity()) as f64;
+    metrics::gauge!("blazingrail_queue_depth").set(depth_value);
 
     Ok(StatusCode::ACCEPTED)
 }

@@ -43,13 +43,26 @@ impl BatcherState {
     }
 }
 
+fn record_batch_metrics(batch_size: usize, flush_duration: Duration) {
+    metrics::histogram!("blazingrail_batch_size").record(batch_size as f64);
+    metrics::histogram!("blazingrail_batch_flush_duration_seconds").record(flush_duration.as_secs_f64());
+}
+
 impl Batcher {
     async fn flush(&self, state: &mut BatcherState) -> Result<(), SinkError> {
+        let start = Instant::now();
+
         let batch = replace(&mut state.buffer, Vec::with_capacity(self.capacity));
+
+        let batch_size = batch.len();
+
         self.event_sink
             .send_batch(batch)
             .await
             .inspect_err(|e| tracing::error!(error = %e, "sink write failed"))?;
+
+        let duration = start.elapsed();
+        record_batch_metrics(batch_size, duration);
         Ok(())
     }
     async fn handle_recv(
