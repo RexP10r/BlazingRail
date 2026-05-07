@@ -2,7 +2,7 @@ use anyhow::Result;
 use axum::{Router, routing::get, routing::post};
 use common::{Config, EventInput, PipelineConfig};
 use dotenvy::dotenv;
-use pipeline::{Batcher, EventSink, FileSink, KafkaSink};
+use pipeline::{Batcher, CircuitBreaker, EventSink, FileSink, KafkaSink};
 use std::env;
 use std::{net::SocketAddr, sync::Arc};
 use tokio::signal::ctrl_c;
@@ -25,14 +25,17 @@ use handler::handle_create_event;
 use crate::handler::check_health;
 
 fn init_sink(pipeline_config: &PipelineConfig) -> Result<Arc<dyn EventSink>, InitError> {
-    let sink: Arc<dyn EventSink> = if pipeline_config.enable_kafka {
-        let kafka = KafkaSink::new(pipeline_config)?;
-        Arc::new(kafka)
-    } else {
-        let file = FileSink::new(pipeline_config)?;
-        Arc::new(file)
-    };
-    Ok(sink)
+    let fallback = Arc::new(FileSink::new(pipeline_config)?);
+    if pipeline_config.enable_kafka {
+        match KafkaSink::new(pipeline_config) {
+            Ok(primary) => {
+                let breaker = CircuitBreaker::new(Arc::new(primary), fallback, pipeline_config);
+                return Ok(Arc::new(breaker));
+            }
+            Err(e) => tracing::warn!(error = %e, "Kafka init failed, fallback to file sink")
+        }
+    }
+    Ok(fallback)
 }
 
 #[tokio::main(flavor = "multi_thread", worker_threads = 12)]
@@ -77,11 +80,11 @@ async fn main() -> Result<()> {
 
     let socket = Socket::new(Domain::IPV4, Type::STREAM, None)?;
     socket.set_reuse_address(true)?;
-    socket.set_nonblocking(true)?; 
+    socket.set_nonblocking(true)?;
 
-    socket.bind(&addr.into())?;   
+    socket.bind(&addr.into())?;
     socket.listen(config.app.socket_max_connections)?;
-    
+
     let std_listener = std::net::TcpListener::from(socket);
     let listener = TcpListener::from_std(std_listener)?;
     let shutdown_signal = async {

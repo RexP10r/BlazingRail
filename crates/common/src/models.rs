@@ -14,7 +14,7 @@ pub enum ValidationError {
     PayloadTooLarge,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct EventInput {
     pub event_type: String,
     pub payload: Box<RawValue>,

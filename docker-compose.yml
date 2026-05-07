@@ -6,7 +6,7 @@ services:
     env_file: .env
     environment:
       - RUST_LOG=info
-      - ENABLE_KAFKA=false
+      - ENABLE_KAFKA=true
     depends_on:
       kafka:
         condition: service_healthy
