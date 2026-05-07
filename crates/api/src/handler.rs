@@ -4,6 +4,7 @@ use axum::{
     http::StatusCode,
     response::{IntoResponse, Response},
 };
+use axum_prometheus::metrics_exporter_prometheus::PrometheusHandle;
 use common::EventInput;
 use std::sync::Arc;
 use tokio::sync::mpsc::error::TrySendError;
@@ -26,4 +27,13 @@ pub async fn handle_create_event(
 
 pub async fn check_health() -> Response {
     StatusCode::ACCEPTED.into_response()
+}
+
+pub async fn metrics_handler(handle: PrometheusHandle) -> impl IntoResponse {
+    let body = handle.render();
+    (
+        StatusCode::OK,
+        [("Content-Type", "text/plain; version=0.1.0")],
+        body,
+    )
 }

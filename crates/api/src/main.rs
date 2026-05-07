@@ -1,5 +1,6 @@
 use anyhow::Result;
 use axum::{Router, routing::get, routing::post};
+use axum_prometheus::PrometheusMetricLayer;
 use common::{Config, EventInput, KafkaRoutingConfig, PipelineConfig};
 use dotenvy::dotenv;
 use pipeline::{Batcher, CircuitBreaker, EventSink, FileSink, KafkaSink};
@@ -22,7 +23,7 @@ use state::AppState;
 mod handler;
 use handler::handle_create_event;
 
-use crate::handler::check_health;
+use crate::handler::{check_health, metrics_handler};
 
 fn init_sink(pipeline_config: &PipelineConfig) -> Result<Arc<dyn EventSink>, InitError> {
     let fallback = Arc::new(FileSink::new(pipeline_config)?);
@@ -75,10 +76,13 @@ async fn main() -> Result<()> {
     });
 
     let state = AppState::new(tx_app);
+    let (prometheus_layer, metric_handle) = PrometheusMetricLayer::pair();
     let app: Router = Router::new()
         .route("/v1/events", post(handle_create_event))
         .route("/health", get(check_health))
-        .with_state(Arc::new(state));
+        .route("/metrics", get(move || metrics_handler(metric_handle)))
+        .with_state(Arc::new(state))
+        .layer(prometheus_layer);
 
     let addr = SocketAddr::from((config.app.server_host, config.app.server_port));
     tracing::info!("Server launched on {}", &addr);
