@@ -1,6 +1,6 @@
 use anyhow::Result;
 use axum::{Router, routing::get, routing::post};
-use common::{Config, EventInput, PipelineConfig};
+use common::{Config, EventInput, KafkaRoutingConfig, PipelineConfig};
 use dotenvy::dotenv;
 use pipeline::{Batcher, CircuitBreaker, EventSink, FileSink, KafkaSink};
 use std::env;
@@ -27,12 +27,17 @@ use crate::handler::check_health;
 fn init_sink(pipeline_config: &PipelineConfig) -> Result<Arc<dyn EventSink>, InitError> {
     let fallback = Arc::new(FileSink::new(pipeline_config)?);
     if pipeline_config.enable_kafka {
-        match KafkaSink::new(pipeline_config) {
+        let routing_conf: KafkaRoutingConfig;
+        match KafkaRoutingConfig::new(&pipeline_config.kafka_routing_conf_path) {
+            Some(content) => routing_conf = content,
+            None => return Err(InitError::WrongKafkaConfig),
+        };
+        match KafkaSink::new(pipeline_config, &routing_conf) {
             Ok(primary) => {
                 let breaker = CircuitBreaker::new(Arc::new(primary), fallback, pipeline_config);
                 return Ok(Arc::new(breaker));
             }
-            Err(e) => tracing::warn!(error = %e, "Kafka init failed, fallback to file sink")
+            Err(e) => tracing::warn!(error = %e, "Kafka init failed, fallback to file sink"),
         }
     }
     Ok(fallback)

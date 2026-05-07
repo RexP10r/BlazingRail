@@ -3,8 +3,8 @@ use axum::{
     http::StatusCode,
     response::{IntoResponse, Response},
 };
-use serde::Serialize;
 use common::ValidationError;
+use serde::Serialize;
 
 #[derive(Debug, thiserror::Error)]
 pub enum InitError {
@@ -13,6 +13,9 @@ pub enum InitError {
 
     #[error("File I/O failed: {0}")]
     Io(#[from] std::io::Error),
+
+    #[error("Wrong Kafka routing config")]
+    WrongKafkaConfig,
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -53,11 +56,7 @@ impl IntoResponse for AppError {
                 "Internal Error",
                 "Channel Closed".into(),
             ),
-            AppError::JsonParse(e) => (
-                StatusCode::BAD_REQUEST,
-                "Json Parse Error",
-                e.to_string()
-            )
+            AppError::JsonParse(e) => (StatusCode::BAD_REQUEST, "Json Parse Error", e.to_string()),
         };
         let body = Json(AppErrorResponse {
             type_: format!("https://api.blazingrail.dev/errors/{}", status.as_str()),

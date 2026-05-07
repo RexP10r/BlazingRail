@@ -1,8 +1,4 @@
-use std::{
-    collections::HashMap,
-    net::IpAddr,
-    path::{Path, PathBuf},
-};
+use std::{collections::HashMap, net::IpAddr, path::PathBuf};
 
 use clap::Parser;
 use serde::Deserialize;
@@ -30,10 +26,11 @@ pub struct KafkaRoutingConfig {
     pub topic_mapping: HashMap<String, String>,
 }
 
-pub fn load_kafka_routing(config_path: Option<&Path>) -> Option<KafkaRoutingConfig> {
-    config_path
-        .map(|p| std::fs::read_to_string(p))
-        .and_then(|c| serde_yaml::from_str(&c.unwrap()).ok())
+impl KafkaRoutingConfig {
+    pub fn new(config_path: &String) -> Option<KafkaRoutingConfig> {
+        let content = std::fs::read_to_string(config_path).ok()?;
+        serde_yaml::from_str(&content).ok()
+    }
 }
 
 #[derive(Parser, Debug)]

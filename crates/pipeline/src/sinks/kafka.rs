@@ -1,8 +1,8 @@
 use futures::future::try_join_all;
-use std::time::Duration;
+use std::{collections::HashMap, time::Duration};
 
 use async_trait::async_trait;
-use common::{EventInput, PipelineConfig};
+use common::{EventInput, KafkaRoutingConfig, PipelineConfig};
 use rdkafka::{
     ClientConfig,
     error::KafkaError,
@@ -14,10 +14,15 @@ use crate::{EventSink, SinkError};
 pub struct KafkaSink {
     producer: FutureProducer,
     timeout: Duration,
+    routing: HashMap<String, String>,
+    default_topic: String,
 }
 
 impl KafkaSink {
-    pub fn new(pipeline_config: &PipelineConfig) -> Result<Self, KafkaError> {
+    pub fn new(
+        pipeline_config: &PipelineConfig,
+        routing_config: &KafkaRoutingConfig,
+    ) -> Result<Self, KafkaError> {
         let producer = ClientConfig::new()
             .set("bootstrap.servers", &pipeline_config.kafka_brokers)
             // --- Delivery ---
@@ -34,13 +39,14 @@ impl KafkaSink {
             .set("retry.backoff.ms", "100")
             // --- Socket ---
             .set("socket.keepalive.enable", "true")
-            .set("socket.nagle.disable", "true") 
-
+            .set("socket.nagle.disable", "true")
             .create()?;
         tracing::info!("Kafka sink initializated");
         Ok(Self {
             producer: producer,
             timeout: Duration::from_millis(pipeline_config.kafka_timeout_ms + 1024),
+            routing: routing_config.topic_mapping.clone(),
+            default_topic: routing_config.default_topic.clone(),
         })
     }
 }
@@ -54,7 +60,9 @@ impl EventSink for KafkaSink {
                 let producer = self.producer.clone();
                 async move {
                     let payload = input.payload.get().as_bytes();
-                    let topic = input.event_type.clone();
+                    let topic = self
+                        .routing.get(&input.event_type)
+                        .unwrap_or(&self.default_topic);
                     let key = input.event_type.into_bytes();
                     let record = FutureRecord::to(&topic).payload(payload).key(&key);
                     producer
