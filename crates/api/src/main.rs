@@ -5,6 +5,7 @@ use common::{Config, EventInput, KafkaRoutingConfig, PipelineConfig};
 use dotenvy::dotenv;
 use pipeline::{Batcher, CircuitBreaker, EventSink, FileSink, KafkaSink};
 use std::env;
+use std::time::Duration;
 use std::{net::SocketAddr, sync::Arc};
 use tokio::signal::ctrl_c;
 use tokio::{net::TcpListener, sync::mpsc::channel};
@@ -108,12 +109,20 @@ async fn main() -> Result<()> {
 
     drop(tx_main);
 
-    match pipeline_handle.await {
-        Ok(Ok(())) => tracing::info!("pipeline shutdown complete"),
-        Ok(Err(e)) => tracing::error!(error=%e, "pipeline returned error on shutdown"),
-        Err(e) => tracing::error!(error=%e, "pipeline task panicked"),
-    }
+    let shutdown_timeout = Duration::from_secs(config.app.shutdown_timeout_secs);
+    let shutdown_result = tokio::time::timeout(shutdown_timeout, pipeline_handle)
+        .await
+        .map_err(|_| "shutdown_timeout") 
+        .and_then(|join| join.map_err(|_| "task_panicked"));
 
+    match shutdown_result {
+        Ok(Ok(())) => tracing::info!("pipeline shutdown complete"),
+        Ok(Err(e)) => tracing::error!(error=%e, "pipeline error: {}", e),
+        Err(e) => {
+            tracing::error!(e, "shutdown failed: {} — forcing exit", e);
+            std::process::exit(1);
+        }
+    }
     tracing::info!("Application shutdown complete");
 
     Ok(())
