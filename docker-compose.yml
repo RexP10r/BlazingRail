@@ -5,7 +5,7 @@ services:
       dockerfile: Dockerfile
     env_file: .env
     environment:
-      - RUST_LOG=info
+      - RUST_LOG=api=info,pipeline=info,rdkafka=warn 
       - ENABLE_KAFKA=true
     depends_on:
       kafka:

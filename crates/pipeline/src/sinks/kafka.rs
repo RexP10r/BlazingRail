@@ -35,6 +35,7 @@ impl KafkaSink {
             // --- Socket ---
             .set("socket.keepalive.enable", "true")
             .set("socket.nagle.disable", "true") 
+
             .create()?;
         tracing::info!("Kafka sink initializated");
         Ok(Self {
@@ -52,11 +53,10 @@ impl EventSink for KafkaSink {
             .map(|input| {
                 let producer = self.producer.clone();
                 async move {
-                    let payload =
-                        serde_json::to_vec(&input.payload).map_err(SinkError::Serialization)?;
+                    let payload = input.payload.get().as_bytes();
                     let topic = input.event_type.clone();
                     let key = input.event_type.into_bytes();
-                    let record = FutureRecord::to(&topic).payload(&payload).key(&key);
+                    let record = FutureRecord::to(&topic).payload(payload).key(&key);
                     producer
                         .send(record, Duration::ZERO)
                         .await

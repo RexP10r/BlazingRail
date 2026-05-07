@@ -23,7 +23,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 impl CircuitBreaker {
     pub fn new(
-        primary_sink:  Arc<dyn EventSink>,
+        primary_sink: Arc<dyn EventSink>,
         fallback_sink: Arc<dyn EventSink>,
         pipeline_config: &PipelineConfig,
     ) -> Self {
@@ -45,6 +45,11 @@ impl CircuitBreaker {
     }
     fn record_failure(&self) {
         let prev = self.error_count.fetch_add(1, Ordering::AcqRel);
+        tracing::warn!(
+            current_count = prev + 1,
+            threshold = self.threshold,
+            "circuit breaker failure recorded"
+        );
         if prev + 1 >= self.threshold {
             self.open_circuit();
         }
@@ -59,10 +64,14 @@ impl CircuitBreaker {
         let resume_at = self.now_ms() + self.timeout.as_millis() as u64;
         assert!(resume_at <= usize::MAX as u64, "timestamp overflow");
         self.open_time.store(resume_at as usize, Ordering::Release);
+        tracing::error!("Primary sink failed, circuit opened");
     }
 
     fn reset_circuit(&self) {
-        self.open_time.store(0, Ordering::Release);
+        let prev = self.open_time.swap(0, Ordering::Release);
+        if prev != 0 {
+            tracing::info!("Circuit breaker CLOSED — resumed primary sink");
+        }
         self.error_count.store(0, Ordering::Release);
     }
 }
@@ -71,7 +80,11 @@ impl CircuitBreaker {
 impl EventSink for CircuitBreaker {
     async fn send_batch(&self, batch: Vec<EventInput>) -> Result<(), SinkError> {
         if self.is_open() {
-            return self.fallback_sink.send_batch(batch).await;
+            return self
+                .fallback_sink
+                .send_batch(batch)
+                .await
+                .inspect_err(|e| tracing::error!(error=%e, "fallback sink also failed"));
         }
 
         match self.primary_sink.send_batch(batch).await {
@@ -81,8 +94,6 @@ impl EventSink for CircuitBreaker {
             }
             Err(e) => {
                 self.record_failure();
-
-                tracing::error!(error=%e, "Primary sink failed, circuit opened");
                 Err(e)
             }
         }

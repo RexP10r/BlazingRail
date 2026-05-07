@@ -11,20 +11,20 @@ pub struct AppConfig {
     #[arg(long, env = "SERVER_PORT", default_value_t = 3000)]
     pub server_port: u16,
 
-    #[arg(long, env = "CHANNEL_CAPACITY", default_value_t = 4096)]
+    #[arg(long, env = "CHANNEL_CAPACITY", default_value_t = 16384)]
     pub channel_capacity: usize,
 
-    #[arg(long, env = "SOCKET_MAX_CONNECTIONS", default_value_t = 1024)]
+    #[arg(long, env = "SOCKET_MAX_CONNECTIONS", default_value_t = 4096)]
     pub socket_max_connections: i32,
 }
 
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
 pub struct PipelineConfig {
-    #[arg(long, env = "BATCH_SIZE", default_value_t = 1024)]
+    #[arg(long, env = "BATCH_SIZE", default_value_t = 512)]
     pub batch_size: usize,
 
-    #[arg(long, env = "BATCH_CAPACITY", default_value_t = 16384)]
+    #[arg(long, env = "BATCH_CAPACITY", default_value_t = 8192)]
     pub batch_capacity: usize,
 
     #[arg(long, env = "FLUSH_TIMEOUT_MS", default_value_t = 128)]
@@ -39,16 +39,16 @@ pub struct PipelineConfig {
     #[arg(long, env = "KAFKA_BROKERS", default_value = "127.0.0.1:9092")]
     pub kafka_brokers: String,
 
-    #[arg(long, env = "KAFKA_TIMEOUT_MS", default_value_t = 16384)]
+    #[arg(long, env = "KAFKA_TIMEOUT_MS", default_value_t = 512)]
     pub kafka_timeout_ms: u64,
 
     #[arg(long, env = "KAFKA_COMPRESSION", default_value = "lz4")]
     pub kafka_compression: String,
 
-    #[arg(long, env = "CIRCUIT_BREAKER_THRESHOLD", default_value_t=4)]
+    #[arg(long, env = "CIRCUIT_BREAKER_THRESHOLD", default_value_t=2)]
     pub circuit_breaker_threshold: usize,
 
-    #[arg(long, env = "CIRCUIT_BREAKER_TIMEOUT", default_value_t=16384)]
+    #[arg(long, env = "CIRCUIT_BREAKER_TIMEOUT", default_value_t=2048)]
     pub circuit_breaker_timeout: u64
 }
 
