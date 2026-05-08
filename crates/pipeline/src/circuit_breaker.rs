@@ -1,25 +1,25 @@
 use std::{
     sync::{
         Arc,
+        RwLock,
         atomic::{AtomicUsize, Ordering},
     },
     time::Duration,
 };
-
-use crate::{EventSink, SinkError};
+use tokio::time::Instant;
 use async_trait::async_trait;
 use common::{EventInput, PipelineConfig};
+
+use crate::{EventSink, SinkError};
 
 pub struct CircuitBreaker {
     primary_sink: Arc<dyn EventSink>,
     fallback_sink: Arc<dyn EventSink>,
     timeout: Duration,
-    open_time: AtomicUsize,
+    open_until: RwLock<Option<Instant>>,
     threshold: usize,
     error_count: AtomicUsize,
 }
-
-use std::time::{SystemTime, UNIX_EPOCH};
 
 impl CircuitBreaker {
     pub fn new(
@@ -32,17 +32,34 @@ impl CircuitBreaker {
             primary_sink,
             fallback_sink,
             timeout: Duration::from_millis(pipeline_config.circuit_breaker_timeout),
-            open_time: AtomicUsize::new(0),
+            open_until: RwLock::new(None),
             threshold: pipeline_config.circuit_breaker_threshold,
             error_count: AtomicUsize::new(0),
         }
     }
-    fn now_ms(&self) -> u64 {
-        SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_millis() as u64
+
+    fn is_open(&self) -> bool {
+        match self.open_until.read().unwrap().as_ref() {
+            Some(deadline) => Instant::now() < *deadline,
+            None => false,
+        }
     }
+
+    fn open_circuit(&self) {
+        *self.open_until.write().unwrap() = Some(Instant::now() + self.timeout);
+        tracing::error!("Primary sink failed, circuit opened");
+    }
+
+    fn reset_circuit(&self) {
+        let mut guard = self.open_until.write().unwrap();
+        let was_open = guard.is_some();
+        *guard = None;
+        if was_open {
+            tracing::info!("Circuit breaker CLOSED — resumed primary sink");
+        }
+        self.error_count.store(0, Ordering::Release);
+    }
+
     fn record_failure(&self) {
         let prev = self.error_count.fetch_add(1, Ordering::AcqRel);
         tracing::warn!(
@@ -53,26 +70,6 @@ impl CircuitBreaker {
         if prev + 1 >= self.threshold {
             self.open_circuit();
         }
-    }
-
-    fn is_open(&self) -> bool {
-        let resume_at = self.open_time.load(Ordering::Acquire) as u64;
-        self.now_ms() < resume_at
-    }
-
-    fn open_circuit(&self) {
-        let resume_at = self.now_ms() + self.timeout.as_millis() as u64;
-        assert!(resume_at <= usize::MAX as u64, "timestamp overflow");
-        self.open_time.store(resume_at as usize, Ordering::Release);
-        tracing::error!("Primary sink failed, circuit opened");
-    }
-
-    fn reset_circuit(&self) {
-        let prev = self.open_time.swap(0, Ordering::Release);
-        if prev != 0 {
-            tracing::info!("Circuit breaker CLOSED — resumed primary sink");
-        }
-        self.error_count.store(0, Ordering::Release);
     }
 }
 
