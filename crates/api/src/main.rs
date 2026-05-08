@@ -4,11 +4,11 @@ use axum_prometheus::PrometheusMetricLayer;
 use common::{Config, EventInput, KafkaRoutingConfig, PipelineConfig};
 use dotenvy::dotenv;
 use pipeline::{Batcher, CircuitBreaker, EventSink, FileSink, KafkaSink};
-use tokio::signal::unix::{SignalKind, signal};
 use std::env;
 use std::time::Duration;
 use std::{net::SocketAddr, sync::Arc};
 use tokio::signal::ctrl_c;
+use tokio::signal::unix::{SignalKind, signal};
 use tokio::sync::watch;
 use tokio::{net::TcpListener, sync::mpsc::channel};
 use tracing_subscriber::layer::SubscriberExt;
@@ -44,7 +44,10 @@ fn init_sink(pipeline_config: &PipelineConfig) -> Result<Arc<dyn EventSink>, Ini
                     primary_arc
                 });
             }
-            Err(e) => tracing::warn!(error = %e, "Kafka init failed, fallback to file sink"),
+            Err(e) => {
+                tracing::warn!(error = %e, "Kafka init failed, fallback to file sink");
+                return Err(InitError::Kafka(e));
+            }
         }
     }
 
