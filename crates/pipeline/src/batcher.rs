@@ -13,6 +13,7 @@ pub struct Batcher {
     capacity: usize,
     timeout: Duration,
     shutdwon_rx: tokio::sync::watch::Receiver<bool>,
+    shutdown_drain: bool,
 }
 
 impl Batcher {
@@ -28,6 +29,7 @@ impl Batcher {
             capacity: pipeline_config.batch_size,
             timeout: Duration::from_millis(pipeline_config.flush_timeout_ms),
             shutdwon_rx,
+            shutdown_drain: false,
         }
     }
 }
@@ -95,6 +97,11 @@ impl Batcher {
         let mut state = BatcherState::new(&self);
         loop {
             tokio::select! {
+                _ = self.shutdwon_rx.changed() => {
+                    self.shutdown_drain = true;
+                    tracing::info!("shutdown signal received, entering drain mode");
+                    break;
+                },
                 msg = self.receiver.recv() => {
                     match self.handle_recv(&mut state, msg).await {
                         Ok(true) => break,
@@ -112,7 +119,10 @@ impl Batcher {
                         state.buffer.clear();
                     }
                 },
-                _ = self.shutdwon_rx.changed() => break
+            }
+            if self.shutdown_drain && !state.buffer.is_empty() {
+                tracing::info!("flushing remaining buffer during shutdown drain");
+                self.flush(&mut state).await?;
             }
         }
         Ok(())
