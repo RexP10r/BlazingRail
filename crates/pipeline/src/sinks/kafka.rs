@@ -41,7 +41,7 @@ impl KafkaSink {
             .set("socket.keepalive.enable", "true")
             .set("socket.nagle.disable", "true")
             .create()?;
-        tracing::info!("Kafka sink initializated");
+        tracing::info!("Kafka sink initialized");
         Ok(Self {
             producer: producer,
             timeout: Duration::from_millis(pipeline_config.kafka_timeout_ms + 1024),

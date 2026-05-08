@@ -27,7 +27,7 @@ impl CircuitBreaker {
         fallback_sink: Arc<dyn EventSink>,
         pipeline_config: &PipelineConfig,
     ) -> Self {
-        tracing::info!("Circuit breaker initializated");
+        tracing::info!("Circuit breaker initialized");
         Self {
             primary_sink,
             fallback_sink,

@@ -18,7 +18,7 @@ pub struct AppConfig {
     #[arg(long, env = "SOCKET_MAX_CONNECTIONS", default_value_t = 4096)]
     pub socket_max_connections: i32,
 
-    #[arg(long, env = "SHUTDOWN_TIMEOUT_SECS", default_value_t = 16)]
+    #[arg(long, env = "SHUTDOWN_TIMEOUT_SECS", default_value_t = 4)]
     pub shutdown_timeout_secs: u64,
 }
 

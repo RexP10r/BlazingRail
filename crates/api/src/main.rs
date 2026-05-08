@@ -8,6 +8,7 @@ use std::env;
 use std::time::Duration;
 use std::{net::SocketAddr, sync::Arc};
 use tokio::signal::ctrl_c;
+use tokio::sync::watch;
 use tokio::{net::TcpListener, sync::mpsc::channel};
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
@@ -24,7 +25,7 @@ use state::AppState;
 mod handler;
 use handler::handle_create_event;
 
-use crate::handler::{check_health, metrics_handler};
+use crate::handler::{check_health, check_ready, metrics_handler};
 
 fn init_sink(pipeline_config: &PipelineConfig) -> Result<Arc<dyn EventSink>, InitError> {
     let fallback = Arc::new(FileSink::new(pipeline_config)?);
@@ -44,7 +45,6 @@ fn init_sink(pipeline_config: &PipelineConfig) -> Result<Arc<dyn EventSink>, Ini
     }
     Ok(fallback)
 }
-
 #[tokio::main(flavor = "multi_thread", worker_threads = 12)]
 async fn main() -> Result<()> {
     dotenv().ok();
@@ -63,11 +63,11 @@ async fn main() -> Result<()> {
 
     let config = Config::new();
 
-    let (tx_main, rx) = channel::<EventInput>(config.app.channel_capacity);
-    let tx_app = tx_main.clone();
+    let (tx, rx) = channel::<EventInput>(config.app.channel_capacity);
+    let (shutdown_tx, shutdown_rx) = watch::channel(false);
 
     let sink = init_sink(&config.pipeline)?;
-    let batcher = Batcher::new(rx, sink, &config.pipeline);
+    let batcher = Batcher::new(rx, sink, &config.pipeline, shutdown_rx.clone());
 
     let pipeline_handle = tokio::spawn(async move {
         batcher
@@ -76,13 +76,14 @@ async fn main() -> Result<()> {
             .inspect_err(|e| tracing::error!(error=%e, "pipeline task terminated"))
     });
 
-    let state = AppState::new(tx_app);
+    let state = Arc::new(AppState::new(tx, shutdown_rx));
     let (prometheus_layer, metric_handle) = PrometheusMetricLayer::pair();
     let app: Router = Router::new()
         .route("/v1/events", post(handle_create_event))
         .route("/health", get(check_health))
         .route("/metrics", get(move || metrics_handler(metric_handle)))
-        .with_state(Arc::new(state))
+        .route("/ready", get(check_ready))
+        .with_state(state.clone())
         .layer(prometheus_layer);
 
     let addr = SocketAddr::from((config.app.server_host, config.app.server_port));
@@ -107,12 +108,12 @@ async fn main() -> Result<()> {
         .with_graceful_shutdown(shutdown_signal)
         .await?;
 
-    drop(tx_main);
+    shutdown_tx.send(true).ok();
 
     let shutdown_timeout = Duration::from_secs(config.app.shutdown_timeout_secs);
     let shutdown_result = tokio::time::timeout(shutdown_timeout, pipeline_handle)
         .await
-        .map_err(|_| "shutdown_timeout") 
+        .map_err(|_| "shutdown_timeout")
         .and_then(|join| join.map_err(|_| "task_panicked"));
 
     match shutdown_result {

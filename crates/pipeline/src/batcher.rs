@@ -12,6 +12,7 @@ pub struct Batcher {
     event_sink: Arc<dyn EventSink>,
     capacity: usize,
     timeout: Duration,
+    shutdwon_rx: tokio::sync::watch::Receiver<bool>,
 }
 
 impl Batcher {
@@ -19,12 +20,14 @@ impl Batcher {
         receiver: Receiver<EventInput>,
         event_sink: Arc<dyn EventSink>,
         pipeline_config: &PipelineConfig,
+        shutdwon_rx: tokio::sync::watch::Receiver<bool>,
     ) -> Self {
         Self {
             receiver,
             event_sink,
             capacity: pipeline_config.batch_size,
             timeout: Duration::from_millis(pipeline_config.flush_timeout_ms),
+            shutdwon_rx,
         }
     }
 }
@@ -43,18 +46,11 @@ impl BatcherState {
     }
 }
 
-fn record_batch_metrics(batch_size: usize, flush_duration: Duration) {
-    metrics::histogram!("blazingrail_batch_size").record(batch_size as f64);
-    metrics::histogram!("blazingrail_batch_flush_duration_seconds").record(flush_duration.as_secs_f64());
-}
-
 impl Batcher {
     async fn flush(&self, state: &mut BatcherState) -> Result<(), SinkError> {
         let start = Instant::now();
 
         let batch = replace(&mut state.buffer, Vec::with_capacity(self.capacity));
-
-        let batch_size = batch.len();
 
         self.event_sink
             .send_batch(batch)
@@ -62,7 +58,8 @@ impl Batcher {
             .inspect_err(|e| tracing::error!(error = %e, "sink write failed"))?;
 
         let duration = start.elapsed();
-        record_batch_metrics(batch_size, duration);
+        metrics::histogram!("blazingrail_batch_flush_duration_seconds")
+            .record(duration.as_secs_f64());
         Ok(())
     }
     async fn handle_recv(
@@ -114,7 +111,8 @@ impl Batcher {
                         tracing::error!(error = %e, "timeout flush failed");
                         state.buffer.clear();
                     }
-                }
+                },
+                _ = self.shutdwon_rx.changed() => break
             }
         }
         Ok(())

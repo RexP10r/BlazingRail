@@ -1,9 +1,4 @@
-use axum::{
-    Json,
-    extract::State,
-    http::StatusCode,
-    response::{IntoResponse, Response},
-};
+use axum::{Json, extract::State, http::StatusCode, response::IntoResponse};
 use axum_prometheus::metrics_exporter_prometheus::PrometheusHandle;
 use common::EventInput;
 use std::sync::Arc;
@@ -28,8 +23,8 @@ pub async fn handle_create_event(
     Ok(StatusCode::ACCEPTED)
 }
 
-pub async fn check_health() -> Response {
-    StatusCode::ACCEPTED.into_response()
+pub async fn check_health() -> StatusCode {
+    StatusCode::OK
 }
 
 pub async fn metrics_handler(handle: PrometheusHandle) -> impl IntoResponse {
@@ -39,4 +34,11 @@ pub async fn metrics_handler(handle: PrometheusHandle) -> impl IntoResponse {
         [("Content-Type", "text/plain; version=0.1.0")],
         body,
     )
+}
+
+pub async fn check_ready(State(state): State<Arc<AppState>>) -> StatusCode {
+    if *state.shutdown_rx.borrow() {
+        return StatusCode::SERVICE_UNAVAILABLE;
+    }
+    StatusCode::OK
 }
