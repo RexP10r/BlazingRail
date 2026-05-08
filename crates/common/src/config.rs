@@ -30,7 +30,7 @@ pub struct KafkaRoutingConfig {
 }
 
 impl KafkaRoutingConfig {
-    pub fn new(config_path: &String) -> Option<KafkaRoutingConfig> {
+    pub fn new(config_path: &PathBuf) -> Option<KafkaRoutingConfig> {
         let content = std::fs::read_to_string(config_path).ok()?;
         serde_yaml::from_str(&content).ok()
     }
@@ -59,7 +59,7 @@ pub struct PipelineConfig {
         env = "KAFKA_ROUTING_CONF_PATH",
         default_value = "kafka_routing.yaml"
     )]
-    pub kafka_routing_conf_path: String,
+    pub kafka_routing_conf_path: PathBuf,
 
     #[arg(long, env = "KAFKA_BROKERS", default_value = "127.0.0.1:9092")]
     pub kafka_brokers: String,
