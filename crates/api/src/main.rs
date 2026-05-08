@@ -54,7 +54,7 @@ fn init_sink(pipeline_config: &PipelineConfig) -> Result<Arc<dyn EventSink>, Ini
     Ok(fallback)
 }
 
-#[tokio::main(flavor = "multi_thread", worker_threads = 12)]
+#[tokio::main]
 async fn main() -> Result<()> {
     dotenv().ok();
 
