@@ -28,23 +28,28 @@ use handler::handle_create_event;
 use crate::handler::{check_health, check_ready, metrics_handler};
 
 fn init_sink(pipeline_config: &PipelineConfig) -> Result<Arc<dyn EventSink>, InitError> {
-    let fallback = Arc::new(FileSink::new(pipeline_config)?);
+    let fallback: Arc<dyn EventSink> = Arc::new(FileSink::new(pipeline_config)?);
+
     if pipeline_config.enable_kafka {
-        let routing_conf: KafkaRoutingConfig;
-        match KafkaRoutingConfig::new(&pipeline_config.kafka_routing_conf_path) {
-            Some(content) => routing_conf = content,
-            None => return Err(InitError::WrongKafkaConfig),
-        };
+        let routing_conf = KafkaRoutingConfig::new(&pipeline_config.kafka_routing_conf_path)
+            .ok_or(InitError::WrongKafkaConfig)?;
+
         match KafkaSink::new(pipeline_config, &routing_conf) {
             Ok(primary) => {
-                let breaker = CircuitBreaker::new(Arc::new(primary), fallback, pipeline_config);
-                return Ok(Arc::new(breaker));
+                let primary_arc: Arc<dyn EventSink> = Arc::new(primary);
+                return Ok(if pipeline_config.enable_circuit_breaker {
+                    Arc::new(CircuitBreaker::new(primary_arc, fallback, pipeline_config))
+                } else {
+                    primary_arc
+                });
             }
             Err(e) => tracing::warn!(error = %e, "Kafka init failed, fallback to file sink"),
         }
     }
+
     Ok(fallback)
 }
+
 #[tokio::main(flavor = "multi_thread", worker_threads = 12)]
 async fn main() -> Result<()> {
     dotenv().ok();

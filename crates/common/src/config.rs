@@ -70,6 +70,9 @@ pub struct PipelineConfig {
     #[arg(long, env = "KAFKA_COMPRESSION", default_value = "lz4")]
     pub kafka_compression: String,
 
+    #[arg(long, env = "ENABLE_CIRCUIT_BREAKER", default_value_t = false)]
+    pub enable_circuit_breaker: bool,
+
     #[arg(long, env = "CIRCUIT_BREAKER_THRESHOLD", default_value_t = 2)]
     pub circuit_breaker_threshold: usize,
 
