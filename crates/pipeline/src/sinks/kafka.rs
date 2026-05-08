@@ -1,4 +1,4 @@
-use futures::future::try_join_all;
+use futures::future::{join_all, try_join_all};
 use std::{collections::HashMap, time::Duration};
 
 use async_trait::async_trait;
@@ -73,9 +73,23 @@ impl EventSink for KafkaSink {
             })
             .collect();
 
-        tokio::time::timeout(self.timeout, try_join_all(futures))
+        let results = tokio::time::timeout(self.timeout, join_all(futures))
             .await
-            .map_err(|_| SinkError::Timeout)?
-            .map(|_| ())
+            .map_err(|_| {
+                tracing::error!("Kafka batch send timeout");
+                SinkError::Timeout
+            })?;
+        let errors: Vec<_> = results
+            .into_iter()
+            .enumerate()
+            .filter_map(|(idx, res,)| res.err().map(|e| (idx, e)))
+            .collect();
+        if !errors.is_empty() {
+            for (idx, err) in &errors {
+                tracing::warn!(event_idx=idx, error=%err, "Kafka publish failed");
+            }
+            return Err(errors.into_iter().next().unwrap().1);
+        }
+        Ok(())
     }
 }
