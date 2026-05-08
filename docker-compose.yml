@@ -3,8 +3,11 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+    volumes:
+      - ./kafka_routing.yaml:/etc/blazingrail/kafka_routing.yaml:ro
     env_file: .env
     environment:
+      - KAFKA_ROUTING_CONF_PATH=/etc/blazingrail/kafka_routing.yaml
       - RUST_LOG=api=info,pipeline=info,rdkafka=warn 
       - ENABLE_KAFKA=true
     depends_on:
