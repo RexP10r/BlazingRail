@@ -28,9 +28,6 @@ pub enum AppError {
 
     #[error("internal server error")]
     Internal,
-
-    #[error("invalid json payload")]
-    JsonParse(#[from] serde_json::Error),
 }
 
 #[derive(Serialize)]
@@ -54,9 +51,8 @@ impl IntoResponse for AppError {
             AppError::Internal => (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 "Internal Error",
-                "Channel Closed".into(),
+                "Internal Error".to_string(),
             ),
-            AppError::JsonParse(e) => (StatusCode::BAD_REQUEST, "Json Parse Error", e.to_string()),
         };
         let body = Json(AppErrorResponse {
             type_: format!("https://api.blazingrail.dev/errors/{}", status.as_str()),
