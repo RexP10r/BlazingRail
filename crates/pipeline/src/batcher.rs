@@ -110,6 +110,7 @@ impl Batcher {
                             tracing::error!(error = %e, "sink error, dropping batch and continuing");
                             state.buffer.clear();
                             state.timer.as_mut().reset(Instant::now() + self.timeout);
+                            metrics::counter!("blazingrail_sink_errors_total").increment(1);
                         }
                     }
                 },

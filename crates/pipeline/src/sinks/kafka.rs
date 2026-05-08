@@ -1,4 +1,4 @@
-use futures::future::{join_all, try_join_all};
+use futures::future::join_all;
 use std::{collections::HashMap, time::Duration};
 
 use async_trait::async_trait;
@@ -61,7 +61,8 @@ impl EventSink for KafkaSink {
                 async move {
                     let payload = input.payload.get().as_bytes();
                     let topic = self
-                        .routing.get(&input.event_type)
+                        .routing
+                        .get(&input.event_type)
                         .unwrap_or(&self.default_topic);
                     let key = input.event_type.into_bytes();
                     let record = FutureRecord::to(&topic).payload(payload).key(&key);
@@ -82,7 +83,7 @@ impl EventSink for KafkaSink {
         let errors: Vec<_> = results
             .into_iter()
             .enumerate()
-            .filter_map(|(idx, res,)| res.err().map(|e| (idx, e)))
+            .filter_map(|(idx, res)| res.err().map(|e| (idx, e)))
             .collect();
         if !errors.is_empty() {
             for (idx, err) in &errors {
