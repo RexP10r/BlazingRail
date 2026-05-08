@@ -44,7 +44,9 @@ impl KafkaSink {
         tracing::info!("Kafka sink initialized");
         Ok(Self {
             producer: producer,
-            timeout: Duration::from_millis(pipeline_config.kafka_timeout_ms + 1024),
+            timeout: Duration::from_millis(
+                pipeline_config.kafka_timeout_ms + pipeline_config.kafka_timeout_slack_ms,
+            ),
             routing: routing_config.topic_mapping.clone(),
             default_topic: routing_config.default_topic.clone(),
         })

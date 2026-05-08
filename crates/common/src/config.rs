@@ -6,7 +6,7 @@ use serde::Deserialize;
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
 pub struct AppConfig {
-    #[arg(long, env = "SERVER_HOST", default_value = "0.0.0.0")]
+    #[arg(long, env = "SERVER_HOST", default_value = "127.0.0.1")]
     pub server_host: IpAddr,
 
     #[arg(long, env = "SERVER_PORT", default_value_t = 3000)]
@@ -66,6 +66,9 @@ pub struct PipelineConfig {
 
     #[arg(long, env = "KAFKA_TIMEOUT_MS", default_value_t = 512)]
     pub kafka_timeout_ms: u64,
+
+    #[arg(long, env = "KAFKA_TIMEOUT_SLACK_MS", default_value_t = 1024)]
+    pub kafka_timeout_slack_ms: u64,
 
     #[arg(long, env = "KAFKA_COMPRESSION", default_value = "lz4")]
     pub kafka_compression: String,
