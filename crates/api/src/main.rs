@@ -4,6 +4,7 @@ use axum_prometheus::PrometheusMetricLayer;
 use common::{Config, EventInput, KafkaRoutingConfig, PipelineConfig};
 use dotenvy::dotenv;
 use pipeline::{Batcher, CircuitBreaker, EventSink, FileSink, KafkaSink};
+use tokio::signal::unix::{SignalKind, signal};
 use std::env;
 use std::time::Duration;
 use std::{net::SocketAddr, sync::Arc};
@@ -103,9 +104,11 @@ async fn main() -> Result<()> {
 
     let std_listener = std::net::TcpListener::from(socket);
     let listener = TcpListener::from_std(std_listener)?;
-    let shutdown_signal = async {
-        if let Err(e) = ctrl_c().await {
-            tracing::error!(error = %e, "failed to wait for shutdown signal");
+    let mut sigterm = signal(SignalKind::terminate())?;
+    let shutdown_signal = async move {
+        tokio::select! {
+            _ = ctrl_c() => {},
+            _ = sigterm.recv() => {}
         }
     };
 
