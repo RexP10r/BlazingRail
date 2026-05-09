@@ -1,64 +1,114 @@
 # BlazingRail
-A blazing fast and easy to configure event router for web applications.
 
-## Requirements
-- Docker
-- Docker compose
-- K6
-- cargo
+A minimal event ingestion router: validate -> queue -> batch -> sink.  
+Built with Axum, Tokio, and `rdkafka`. 
+
+## Usage
+
+**Manual**
+```bash
+cargo run --release
+```
+
+**Docker**
+```bash
+docker compose up -d
+```
+
+**Ingest an event**
+```bash
+curl -X POST http://localhost:3000/v1/events \
+  -H "Content-Type: application/json" \
+  -d '{"event_type":"user_action","payload":{"id":42}}'
+```
 
 ## Configuration
-There are variety of possible env vars, all of them presented in `docs/env_example.txt`.
-Presented env vars are already configured as defaults in parser code, so one can safely delete unused env vars.
 
-## Launching
-There are 2 ways to launch it:
-### Manusl 
+All settings via env vars. Defaults are built in — override only what you need.
+Full list: [`docs/env_example.txt`](docs/env_example.txt)
+
+## API
+
+| Endpoint | Method | Response |
+|----------|--------|----------|
+| `/v1/events` | POST | `202 Accepted` / `400` / `503` |
+| `/health` | GET | `200 OK` |
+| `/ready` | GET | `200 OK` / `503 Service Unavailable` |
+| `/metrics` | GET | Prometheus text format |
+
+Event constraints:
+- `event_type`: non-empty, ≤64 chars
+- `payload`: serialized JSON ≤4096 bytes
+
+## Observability
+
 ```bash
-cargo build --release
-cargo run --release
-```
-### Runtime
-```bash
-docker compose build --no-cache
-docker compose up -d --force-recreate
-```
-
-## Managing
-### Metrics 
-One can see metrics on the `/metrics` socket like this example below
-
-```terminal 1
+# Metrics
+## Checkout once
+curl -s http://localhost:3000/metrics | grep blazingrail
+## Watch stream
 watch -n1 'curl -s http://localhost:3000/metrics | grep -E "blazingrail"'
+
+# Logs (Docker)
+docker compose logs -f app
+
+# Logs (manual)
+RUST_LOG=info cargo run --release
 ```
 
-```terminal 2
-cargo run --release
+Metrics:
+- `blazingrail_queue_depth` — current channel occupancy
+- `blazingrail_batch_flush_duration_seconds` — flush latency
+- `blazingrail_sink_errors_total` — failed sends
+
+## Architecture (brief)
+
+```
+HTTP POST /v1/events
+        │
+   [ Validate ] ──> 400 on error
+        │
+   [ mpsc::Channel ] <── backpressure when full (503)
+        │
+   [ Batcher ]
+   └─ flush on: reached batch_size OR flush_timeout_ms
+        │
+   [ CircuitBreaker ] (optional)
+   ├─ primary: KafkaSink
+   ├─ fallback: FileSink
+   └─ opens after N failures, retries after timeout
+        │
+   [ Sink ]
+   ├─ KafkaSink: async publish with routing with respect to event_type
+   └─ FileSink: buffered JSONL append (tokio::task::spawn_blocking)
 ```
 
-```terminal 3
-for i in {1..500}; do \
-curl -s -X POST http://127.0.0.1:3000/v1/events \
--H "Content-Type: application/json" \
--d "{\"event_type\":\"bulk\",\"payload\":{}}" & done ; \
-wait
+## Kafka
+
+When `ENABLE_KAFKA=true`, routing is controlled by `kafka_routing.yaml`:
+
+```yaml
+default_topic: "blazing_events"
+topic_mapping:
+  "load_test": "test"
 ```
 
-### Logs
-Logs will be able to be seen after `cargo run --release` already. 
-But if one prefer to launch by via docker, logs can be seen the way below:
+Debug commands (examples):
 ```bash
-docker compose logs
-```
+# List topics
+docker compose exec kafka /opt/kafka/bin/kafka-topics.sh \
+  --bootstrap-server localhost:9092 --list
 
-### Kafka
-Kafka launches by `docker compose` so one need to execute commands inside.
-```bash
-docker compose exec -it kafka /opt/kafka/bin/kafka-topics.sh \
---bootstrap-server localhost:9092 \
---list
-```
-Or if number commands are needed
-```bash
+# Interactive shell
 docker compose exec kafka bash
+```
+There are number of scripts in `/opt/kafka/bin` dir so one should chekout the official repo. 
+
+## Benchmark
+Load tests use `k6` located in `tests/k6/load.js`(sorry for non rust code in this repo :3).
+Before running, ensure your shell can handle many concurrent connections via `ulimit`.
+Minimum pipeline:
+```bash
+ulimit -n 4096
+k6 run tests/k6/load.js
 ```
