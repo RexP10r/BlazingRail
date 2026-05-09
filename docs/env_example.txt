@@ -1,0 +1,33 @@
+# ==========================================
+# Server Configuration
+# ==========================================
+SERVER_HOST=127.0.0.1
+SERVER_PORT=3000
+CHANNEL_CAPACITY=16384
+SOCKET_MAX_CONNECTIONS=4096
+SHUTDOWN_TIMEOUT_SECS=4
+
+# ==========================================
+# Pipeline Configuration
+# ==========================================
+BATCH_SIZE=512
+BATCH_CAPACITY=8192
+FLUSH_TIMEOUT_MS=128
+PRIME_PATH=/dev/null
+
+# ==========================================
+# Kafka Configuration
+# ==========================================
+ENABLE_KAFKA=false
+KAFKA_ROUTING_CONF_PATH=kafka_routing.yaml
+KAFKA_BROKERS=127.0.0.1:9092
+KAFKA_TIMEOUT_MS=512
+KAFKA_TIMEOUT_SLACK_MS=1024
+KAFKA_COMPRESSION=lz4
+
+# ==========================================
+# Circuit Breaker Configuration
+# ==========================================
+ENABLE_CIRCUIT_BREAKER=false
+CIRCUIT_BREAKER_THRESHOLD=2
+CIRCUIT_BREAKER_TIMEOUT=2048
