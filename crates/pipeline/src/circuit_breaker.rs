@@ -1,14 +1,13 @@
+use async_trait::async_trait;
+use common::{EventInput, PipelineConfig};
 use std::{
     sync::{
-        Arc,
-        RwLock,
+        Arc, RwLock,
         atomic::{AtomicUsize, Ordering},
     },
     time::Duration,
 };
 use tokio::time::Instant;
-use async_trait::async_trait;
-use common::{EventInput, PipelineConfig};
 
 use crate::{EventSink, SinkError};
 
@@ -86,7 +85,9 @@ impl EventSink for CircuitBreaker {
 
         match self.primary_sink.send_batch(batch).await {
             Ok(()) => {
-                self.reset_circuit();
+                if self.error_count.load(Ordering::Relaxed) != 0 {
+                    self.reset_circuit();
+                }
                 Ok(())
             }
             Err(e) => {
