@@ -62,6 +62,46 @@ Metrics:
 - `blazingrail_sink_errors_total` — failed sends
 
 ## Architecture (brief)
+```
+> tree --gitignore
+.
+├── Cargo.toml
+├── Dockerfile
+├── README.md
+├── crates
+│   ├── api
+│   │   ├── Cargo.toml
+│   │   └── src
+│   │       ├── error.rs
+│   │       ├── handler.rs
+│   │       ├── main.rs
+│   │       └── state.rs
+│   ├── common
+│   │   ├── Cargo.toml
+│   │   └── src
+│   │       ├── config.rs
+│   │       ├── lib.rs
+│   │       └── models.rs
+│   └── pipeline
+│       ├── Cargo.toml
+│       └── src
+│           ├── batcher.rs
+│           ├── circuit_breaker.rs
+│           ├── lib.rs
+│           ├── sink.rs
+│           └── sinks
+│               ├── file.rs
+│               ├── kafka.rs
+│               └── mod.rs
+├── docker-compose.yml
+├── docs
+│   └── env_example.txt
+├── kafka_routing.yaml
+└── tests
+    └── k6
+        └── load.js
+
+```
 
 ```
 HTTP POST /v1/events
