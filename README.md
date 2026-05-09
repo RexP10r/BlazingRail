@@ -36,15 +36,15 @@ Full list: [`docs/env_example.txt`](docs/env_example.txt)
 | `/ready` | GET | `200 OK` / `503 Service Unavailable` |
 | `/metrics` | GET | Prometheus text format |
 
-Event constraints:
-- `event_type`: non-empty, ≤64 chars
-- `payload`: serialized JSON ≤4096 bytes
+Event constraints (setting them via env vars is comming):
+- `event_type`: non-empty, <=64 chars
+- `payload`: serialized JSON <=4096 bytes
 
 ## Observability
 
 ```bash
 # Metrics
-## Checkout once
+## Look once
 curl -s http://localhost:3000/metrics | grep blazingrail
 ## Watch stream
 watch -n1 'curl -s http://localhost:3000/metrics | grep -E "blazingrail"'
@@ -102,7 +102,7 @@ docker compose exec kafka /opt/kafka/bin/kafka-topics.sh \
 # Interactive shell
 docker compose exec kafka bash
 ```
-There are number of scripts in `/opt/kafka/bin` dir so one should chekout the official repo. 
+The `/opt/kafka/bin` directory contains a number of scripts, so you should consult the official repository.
 
 ## Benchmark
 Load tests use `k6` located in `tests/k6/load.js`(sorry for non rust code in this repo :3).
