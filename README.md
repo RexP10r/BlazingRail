@@ -25,6 +25,7 @@ curl -X POST http://localhost:3000/v1/events \
 ## Configuration
 
 All settings via env vars. Defaults are built in — override only what you need.
+Ensure that your override values do not conflict with `docker-compose.yml` environment.
 Full list: [`docs/env_example.txt`](docs/env_example.txt)
 
 ## API
