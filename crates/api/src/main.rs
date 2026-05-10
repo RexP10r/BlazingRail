@@ -10,7 +10,6 @@ use std::{net::SocketAddr, sync::Arc};
 use tokio::signal::ctrl_c;
 use tokio::signal::unix::{SignalKind, signal};
 use tokio::sync::{mpsc, watch};
-use tokio::{net::TcpListener, sync::mpsc::channel};
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 use tracing_subscriber::{EnvFilter, fmt};
@@ -51,7 +50,7 @@ fn init_channels(
     mpsc::Receiver<EventInput>,
 ) {
     let (shutdown_tx, shutdown_rx) = watch::channel(false);
-    let (event_tx, event_rx) = channel::<EventInput>(capacity);
+    let (event_tx, event_rx) = mpsc::channel::<EventInput>(capacity);
     (shutdown_tx, shutdown_rx, event_tx, event_rx)
 }
 
@@ -104,7 +103,7 @@ fn build_router(state: Arc<AppState>) -> Router {
         .layer(prometheus_layer)
 }
 
-fn configure_socket(config: &AppConfig) -> Result<TcpListener> {
+fn configure_socket(config: &AppConfig) -> Result<tokio::net::TcpListener> {
     let addr = SocketAddr::from((config.server_host, config.server_port));
     tracing::info!("Server launched on {}", &addr);
 
@@ -116,7 +115,7 @@ fn configure_socket(config: &AppConfig) -> Result<TcpListener> {
     socket.listen(config.socket_max_connections)?;
 
     let std_listener = std::net::TcpListener::from(socket);
-    Ok(TcpListener::from_std(std_listener)?)
+    Ok(tokio::net::TcpListener::from_std(std_listener)?)
 }
 
 async fn wait_for_shutdown_signal() {
