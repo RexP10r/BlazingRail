@@ -27,7 +27,7 @@ impl FileSink {
             writter: Arc::new(Mutex::new(buf_writer)),
         })
     }
-    pub fn flush(
+    pub fn write_batch(
         writter: Arc<Mutex<BufWriter<File>>>,
         batch: Vec<EventInput>,
     ) -> Result<(), SinkError> {
@@ -46,7 +46,7 @@ impl EventSink for FileSink {
     async fn send_batch(&self, batch: Vec<EventInput>) -> Result<(), SinkError> {
         let writter = Arc::clone(&self.writter);
 
-        let result = tokio::task::spawn_blocking(move || Self::flush(writter, batch)).await;
+        let result = tokio::task::spawn_blocking(move || Self::write_batch(writter, batch)).await;
 
         match result {
             Ok(Ok(())) => Ok(()),

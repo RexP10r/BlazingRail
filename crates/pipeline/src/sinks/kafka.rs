@@ -6,7 +6,7 @@ use common::{EventInput, KafkaRoutingConfig, PipelineConfig};
 use rdkafka::{
     ClientConfig,
     error::KafkaError,
-    producer::{FutureProducer, FutureRecord},
+    producer::{FutureProducer, FutureRecord, future_producer::Delivery},
 };
 
 use crate::{EventSink, SinkError};
@@ -51,6 +51,23 @@ impl KafkaSink {
             default_topic: routing_config.default_topic.clone(),
         })
     }
+    pub async fn write_event(
+        &self,
+        input: EventInput,
+        producer: FutureProducer,
+    ) -> Result<Delivery, SinkError> {
+        let payload = input.payload.get().as_bytes();
+        let topic = self
+            .routing
+            .get(&input.event_type)
+            .unwrap_or(&self.default_topic);
+        let key = input.event_type.into_bytes();
+        let record = FutureRecord::to(&topic).payload(payload).key(&key);
+        producer
+            .send(record, Duration::ZERO)
+            .await
+            .map_err(|(e, _)| SinkError::KafkaPublish(e.to_string()))
+    }
 }
 
 #[async_trait]
@@ -60,19 +77,7 @@ impl EventSink for KafkaSink {
             .into_iter()
             .map(|input| {
                 let producer = self.producer.clone();
-                async move {
-                    let payload = input.payload.get().as_bytes();
-                    let topic = self
-                        .routing
-                        .get(&input.event_type)
-                        .unwrap_or(&self.default_topic);
-                    let key = input.event_type.into_bytes();
-                    let record = FutureRecord::to(&topic).payload(payload).key(&key);
-                    producer
-                        .send(record, Duration::ZERO)
-                        .await
-                        .map_err(|(e, _)| SinkError::KafkaPublish(e.to_string()))
-                }
+                async move { Self::write_event(&self, input, producer).await }
             })
             .collect();
 
