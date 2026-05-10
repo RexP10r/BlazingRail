@@ -9,7 +9,7 @@ use std::time::Duration;
 use std::{net::SocketAddr, sync::Arc};
 use tokio::signal::ctrl_c;
 use tokio::signal::unix::{SignalKind, signal};
-use tokio::sync::watch;
+use tokio::sync::{mpsc, watch};
 use tokio::{net::TcpListener, sync::mpsc::channel};
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
@@ -28,6 +28,32 @@ use handler::handle_create_event;
 
 use crate::handler::{check_health, check_ready, metrics_handler};
 
+fn init_logging() {
+    let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
+
+    tracing_subscriber::registry()
+        .with(fmt::layer().json())
+        .with(filter)
+        .init();
+}
+
+fn load_application_config() -> Result<Config> {
+    dotenv().ok();
+    Ok(Config::new())
+}
+
+fn init_channels(
+    capacity: usize,
+) -> (
+    watch::Sender<bool>,
+    watch::Receiver<bool>,
+    mpsc::Sender<EventInput>,
+    mpsc::Receiver<EventInput>,
+) {
+    let (shutdown_tx, shutdown_rx) = watch::channel(false);
+    let (event_tx, event_rx) = channel::<EventInput>(capacity);
+    (shutdown_tx, shutdown_rx, event_tx, event_rx)
+}
 fn init_sink(pipeline_config: &PipelineConfig) -> Result<Arc<dyn EventSink>, InitError> {
     let fallback: Arc<dyn EventSink> = Arc::new(FileSink::new(pipeline_config)?);
 
@@ -56,24 +82,15 @@ fn init_sink(pipeline_config: &PipelineConfig) -> Result<Arc<dyn EventSink>, Ini
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    dotenv().ok();
+    let config = load_application_config()?;
 
-    let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
-    let json_layer = fmt::layer().json();
-    tracing_subscriber::registry()
-        .with(json_layer)
-        .with(filter)
-        .init();
-
+    init_logging();
     tracing::info!(
         "Telemetry initialized. Log level: {}",
         env::var("RUST_LOG").unwrap_or_else(|_| "info".to_string())
     );
 
-    let config = Config::new();
-
-    let (tx, rx) = channel::<EventInput>(config.app.channel_capacity);
-    let (shutdown_tx, shutdown_rx) = watch::channel(false);
+    let (shutdown_tx, shutdown_rx, tx, rx) = init_channels(config.app.channel_capacity);
 
     let sink = init_sink(&config.pipeline)?;
     let batcher = Batcher::new(rx, sink, &config.pipeline, shutdown_rx.clone());
