@@ -1,7 +1,7 @@
 use anyhow::Result;
 use axum::{Router, routing::get, routing::post};
 use axum_prometheus::PrometheusMetricLayer;
-use common::{Config, EventInput, KafkaRoutingConfig, PipelineConfig};
+use common::{AppConfig, Config, EventInput, KafkaRoutingConfig, PipelineConfig};
 use dotenvy::dotenv;
 use pipeline::{Batcher, CircuitBreaker, EventSink, FileSink, KafkaSink};
 use std::env;
@@ -27,10 +27,6 @@ mod handler;
 use handler::handle_create_event;
 
 use crate::handler::{check_health, check_ready, metrics_handler};
-
-// ─────────────────────────────────────────────────────────────
-// Initialization Functions
-// ─────────────────────────────────────────────────────────────
 
 fn init_logging() {
     let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
@@ -97,6 +93,31 @@ fn init_sink(pipeline_config: &PipelineConfig) -> Result<Arc<dyn EventSink>, Ini
     }
 }
 
+fn build_router(state: Arc<AppState>) -> Router {
+    let (prometheus_layer, metric_handle) = PrometheusMetricLayer::pair();
+    Router::new()
+        .route("/v1/events", post(handle_create_event))
+        .route("/health", get(check_health))
+        .route("/metrics", get(move || metrics_handler(metric_handle)))
+        .route("/ready", get(check_ready))
+        .with_state(state.clone())
+        .layer(prometheus_layer)
+}
+
+fn configure_socket(config: &AppConfig) -> Result<TcpListener> {
+    let addr = SocketAddr::from((config.server_host, config.server_port));
+    tracing::info!("Server launched on {}", &addr);
+
+    let socket = Socket::new(Domain::IPV4, Type::STREAM, None)?;
+    socket.set_reuse_address(true)?;
+    socket.set_nonblocking(true)?;
+
+    socket.bind(&addr.into())?;
+    socket.listen(config.socket_max_connections)?;
+
+    let std_listener = std::net::TcpListener::from(socket);
+    Ok(TcpListener::from_std(std_listener)?)
+}
 #[tokio::main]
 async fn main() -> Result<()> {
     let config = load_application_config()?;
@@ -120,27 +141,8 @@ async fn main() -> Result<()> {
     });
 
     let state = Arc::new(AppState::new(tx, shutdown_rx));
-    let (prometheus_layer, metric_handle) = PrometheusMetricLayer::pair();
-    let app: Router = Router::new()
-        .route("/v1/events", post(handle_create_event))
-        .route("/health", get(check_health))
-        .route("/metrics", get(move || metrics_handler(metric_handle)))
-        .route("/ready", get(check_ready))
-        .with_state(state.clone())
-        .layer(prometheus_layer);
+    let app = build_router(state);
 
-    let addr = SocketAddr::from((config.app.server_host, config.app.server_port));
-    tracing::info!("Server launched on {}", &addr);
-
-    let socket = Socket::new(Domain::IPV4, Type::STREAM, None)?;
-    socket.set_reuse_address(true)?;
-    socket.set_nonblocking(true)?;
-
-    socket.bind(&addr.into())?;
-    socket.listen(config.app.socket_max_connections)?;
-
-    let std_listener = std::net::TcpListener::from(socket);
-    let listener = TcpListener::from_std(std_listener)?;
     let mut sigterm = signal(SignalKind::terminate())?;
     let shutdown_signal = async move {
         tokio::select! {
@@ -149,6 +151,7 @@ async fn main() -> Result<()> {
         }
     };
 
+    let listener = configure_socket(&config.app)?;
     axum::serve(listener, app)
         .with_graceful_shutdown(shutdown_signal)
         .await?;
