@@ -28,6 +28,10 @@ use handler::handle_create_event;
 
 use crate::handler::{check_health, check_ready, metrics_handler};
 
+// ─────────────────────────────────────────────────────────────
+// Initialization Functions
+// ─────────────────────────────────────────────────────────────
+
 fn init_logging() {
     let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
 
@@ -54,30 +58,43 @@ fn init_channels(
     let (event_tx, event_rx) = channel::<EventInput>(capacity);
     (shutdown_tx, shutdown_rx, event_tx, event_rx)
 }
+
+fn wrap_with_circuit_breaker(
+    primary: Arc<dyn EventSink>,
+    fallback: Arc<dyn EventSink>,
+    config: &PipelineConfig,
+) -> Arc<dyn EventSink> {
+    if config.enable_circuit_breaker {
+        Arc::new(CircuitBreaker::new(primary, fallback, config))
+    } else {
+        primary
+    }
+}
+
 fn init_sink(pipeline_config: &PipelineConfig) -> Result<Arc<dyn EventSink>, InitError> {
     let fallback: Arc<dyn EventSink> = Arc::new(FileSink::new(pipeline_config)?);
 
-    if pipeline_config.enable_kafka {
-        let routing_conf = KafkaRoutingConfig::new(&pipeline_config.kafka_routing_conf_path)
-            .ok_or(InitError::WrongKafkaConfig)?;
-
-        match KafkaSink::new(pipeline_config, &routing_conf) {
-            Ok(primary) => {
-                let primary_arc: Arc<dyn EventSink> = Arc::new(primary);
-                return Ok(if pipeline_config.enable_circuit_breaker {
-                    Arc::new(CircuitBreaker::new(primary_arc, fallback, pipeline_config))
-                } else {
-                    primary_arc
-                });
-            }
-            Err(e) => {
-                tracing::warn!(error = %e, "Kafka init failed, fallback to file sink");
-                return Err(InitError::Kafka(e));
-            }
-        }
+    if !pipeline_config.enable_kafka {
+        return Ok(fallback);
     }
 
-    Ok(fallback)
+    let routing_conf = KafkaRoutingConfig::new(&pipeline_config.kafka_routing_conf_path)
+        .ok_or(InitError::WrongKafkaConfig)?;
+
+    match KafkaSink::new(pipeline_config, &routing_conf) {
+        Ok(primary) => {
+            let primary_arc: Arc<dyn EventSink> = Arc::new(primary);
+            Ok(wrap_with_circuit_breaker(
+                primary_arc,
+                fallback,
+                pipeline_config,
+            ))
+        }
+        Err(e) => {
+            tracing::warn!(error = %e, "Kafka init failed, fallback to file sink");
+            Err(InitError::Kafka(e))
+        }
+    }
 }
 
 #[tokio::main]
