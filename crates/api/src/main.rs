@@ -3,7 +3,7 @@ use axum::{Router, routing::get, routing::post};
 use axum_prometheus::PrometheusMetricLayer;
 use common::{AppConfig, Config, EventInput, KafkaRoutingConfig, PipelineConfig};
 use dotenvy::dotenv;
-use pipeline::{Batcher, CircuitBreaker, EventSink, FileSink, KafkaSink};
+use pipeline::{Batcher, CircuitBreaker, EventSink, FileSink, KafkaSink, SinkError};
 use std::env;
 use std::time::Duration;
 use std::{net::SocketAddr, sync::Arc};
@@ -118,6 +118,40 @@ fn configure_socket(config: &AppConfig) -> Result<TcpListener> {
     let std_listener = std::net::TcpListener::from(socket);
     Ok(TcpListener::from_std(std_listener)?)
 }
+
+async fn wait_for_shutdown_signal() {
+    let mut sigterm = signal(SignalKind::terminate()).expect("Failed to register SIGTERM handler");
+
+    tokio::select! {
+        _ = ctrl_c() => {},
+        _ = sigterm.recv() => {},
+    }
+}
+async fn handle_graceful_shutdown(
+    pipeline_handle: tokio::task::JoinHandle<Result<(), SinkError>>,
+    shutdown_tx: watch::Sender<bool>,
+    timeout_secs: u64,
+) {
+    shutdown_tx.send(true).ok();
+
+    let shutdown_timeout = Duration::from_secs(timeout_secs);
+    let shutdown_result = tokio::time::timeout(shutdown_timeout, pipeline_handle)
+        .await
+        .map_err(|_| "shutdown_timeout")
+        .and_then(|join| join.map_err(|_| "task_panicked"));
+
+    match shutdown_result {
+        Ok(Ok(())) => tracing::info!("pipeline shutdown complete"),
+        Ok(Err(e)) => tracing::error!(error = %e, "pipeline error: {}", e),
+        Err(e) => {
+            tracing::error!(e, "shutdown failed: {} — forcing exit", e);
+            std::process::exit(1);
+        }
+    }
+
+    tracing::info!("Application shutdown complete");
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
     let config = load_application_config()?;
@@ -143,36 +177,19 @@ async fn main() -> Result<()> {
     let state = Arc::new(AppState::new(tx, shutdown_rx));
     let app = build_router(state);
 
-    let mut sigterm = signal(SignalKind::terminate())?;
-    let shutdown_signal = async move {
-        tokio::select! {
-            _ = ctrl_c() => {},
-            _ = sigterm.recv() => {}
-        }
-    };
+    let shutdown_signal = wait_for_shutdown_signal();
 
     let listener = configure_socket(&config.app)?;
     axum::serve(listener, app)
         .with_graceful_shutdown(shutdown_signal)
         .await?;
 
-    shutdown_tx.send(true).ok();
-
-    let shutdown_timeout = Duration::from_secs(config.app.shutdown_timeout_secs);
-    let shutdown_result = tokio::time::timeout(shutdown_timeout, pipeline_handle)
-        .await
-        .map_err(|_| "shutdown_timeout")
-        .and_then(|join| join.map_err(|_| "task_panicked"));
-
-    match shutdown_result {
-        Ok(Ok(())) => tracing::info!("pipeline shutdown complete"),
-        Ok(Err(e)) => tracing::error!(error=%e, "pipeline error: {}", e),
-        Err(e) => {
-            tracing::error!(e, "shutdown failed: {} — forcing exit", e);
-            std::process::exit(1);
-        }
-    }
-    tracing::info!("Application shutdown complete");
+    handle_graceful_shutdown(
+        pipeline_handle,
+        shutdown_tx,
+        config.app.shutdown_timeout_secs,
+    )
+    .await;
 
     Ok(())
 }
